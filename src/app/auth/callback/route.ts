@@ -41,43 +41,40 @@ export async function GET(request: Request) {
         .from('profiles')
         .select('id')
         .eq('id', authData.user.id)
-        .single()
-        
+        .maybeSingle()
+
       if (!existingProfile) {
         // Create profile for OAuth user
         const fullName = authData.user.user_metadata?.full_name || 'User'
         const avatarUrl = authData.user.user_metadata?.avatar_url || ''
         const email = authData.user.email || ''
-        
-        // Generate a simple unique username
-        const baseUsername = fullName.toLowerCase().replace(/[^a-z0-9]/g, '') || email.split('@')[0].replace(/[^a-z0-9]/g, '')
-        const randomNum = Math.floor(Math.random() * 10000)
-        let newUsername = `${baseUsername}_${randomNum}`
-        
-        // Ensure uniqueness (simple retry loop if collision)
-        let isUnique = false
-        while (!isUnique) {
-          const { data: collision } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('username', newUsername)
-            .single()
-            
-          if (!collision) {
-            isUnique = true
-          } else {
-            newUsername = `${baseUsername}_${Math.floor(Math.random() * 100000)}`
+
+        const baseUsername =
+          fullName.toLowerCase().replace(/[^a-z0-9]/g, '') ||
+          email.split('@')[0].replace(/[^a-z0-9]/g, '') ||
+          'member'
+
+        // Collision detection used to be a `select` against other people's
+        // profile rows, which RLS can hide — the check then always said "free",
+        // the insert lost to the unique index, and the account ended up with no
+        // profile at all (and so no username anyone could invite). Let the
+        // unique constraint be the judge and retry on 23505 instead.
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const candidate = `${baseUsername}_${Math.floor(Math.random() * 100000)}`
+          const { error: insertError } = await supabase.from('profiles').insert({
+            id: authData.user.id,
+            full_name: fullName,
+            username: candidate,
+            email: email,
+            avatar_url: avatarUrl,
+            role: 'participant'
+          })
+          if (!insertError) break
+          if (insertError.code !== '23505') {
+            console.error('Profile creation failed:', insertError)
+            break
           }
         }
-        
-        await supabase.from('profiles').insert({
-          id: authData.user.id,
-          full_name: fullName,
-          username: newUsername,
-          email: email,
-          avatar_url: avatarUrl,
-          role: 'participant'
-        })
       }
       
       const forwardedHost = request.headers.get('x-forwarded-host') // original origin before load balancer

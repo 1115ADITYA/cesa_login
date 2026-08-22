@@ -1,11 +1,179 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Design tokens.
+
+   Every page used to hard-code the same six hex values inline, which is how
+   `globals.css` ended up with a #07070a body under pages painted #130F0E. One
+   palette lives here now; pages reference the tokens.
+   --------------------------------------------------------------------------- */
 :root {
   --font-space-grotesk: 'Space Grotesk', sans-serif;
+
+  --bg: #130f0e;
+  --bg-elevated: #1d1716;
+  --bg-sunken: rgba(0, 0, 0, 0.28);
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.12);
+
+  --text: #f3e9e8;
+  --text-bright: #fdf8f8;
+  --text-muted: #a68f8c;
+  --text-faint: #8c7a77;
+
+  --accent: #e87a8c;
+  --accent-deep: #d16475;
+  --accent-light: #f4a5ae;
+
+  --success: #7ae8a2;
+  --warning: #e8c87a;
+  --danger: #f87171;
+  --info: #7aa2e8;
 }
 
 body {
-  background-color: #07070a;
-  color: #f3f3f6;
+  background-color: var(--bg);
+  color: var(--text);
   overflow-x: hidden;
+  /* Two very soft off-screen glows so large empty pages (an events board with
+     three cards on it) do not read as a flat black rectangle. */
+  background-image:
+    radial-gradient(70rem 40rem at 12% -10%, rgba(232, 122, 140, 0.09), transparent 60%),
+    radial-gradient(60rem 36rem at 105% 8%, rgba(122, 162, 232, 0.06), transparent 55%);
+  background-attachment: fixed;
+}
+
+/* ---------------------------------------------------------------------------
+   Shared components. Tailwind utilities still do most of the work; these exist
+   for the handful of patterns repeated on every single page.
+   --------------------------------------------------------------------------- */
+@layer components {
+  .card {
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+  }
+
+  .card-hover {
+    transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+  }
+  .card-hover:hover {
+    border-color: rgba(232, 122, 140, 0.35);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  }
+
+  .field {
+    width: 100%;
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+    border: 1px solid var(--border);
+    background-color: var(--bg-sunken);
+    color: var(--text);
+    font-size: 0.875rem;
+    outline: none;
+    transition: border-color 140ms ease, background-color 140ms ease;
+  }
+  .field::placeholder {
+    color: #6b5a58;
+  }
+  .field:focus {
+    border-color: var(--accent);
+    background-color: rgba(0, 0, 0, 0.45);
+  }
+
+  .label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    font-size: 0.875rem;
+    border-radius: 0.75rem;
+    padding: 0.7rem 1.1rem;
+    transition: transform 140ms ease, box-shadow 140ms ease, background-color 140ms ease,
+      border-color 140ms ease, opacity 140ms ease;
+    cursor: pointer;
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn-primary {
+    color: #fff;
+    background-image: linear-gradient(100deg, var(--accent-deep), var(--accent) 60%, var(--accent-light));
+    background-size: 200% auto;
+    box-shadow: 0 8px 20px rgba(232, 122, 140, 0.18);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background-position: right center;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 26px rgba(232, 122, 140, 0.32);
+  }
+
+  .btn-ghost {
+    color: var(--text);
+    background-color: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-strong);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .btn-danger {
+    color: var(--danger);
+    background-color: rgba(248, 113, 113, 0.1);
+    border: 1px solid rgba(248, 113, 113, 0.22);
+  }
+  .btn-danger:hover:not(:disabled) {
+    background-color: rgba(248, 113, 113, 0.18);
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .alert {
+    font-size: 0.875rem;
+    padding: 0.75rem 0.9rem;
+    border-radius: 0.75rem;
+    border: 1px solid;
+  }
+  .alert-error {
+    color: var(--danger);
+    background-color: rgba(248, 113, 113, 0.1);
+    border-color: rgba(248, 113, 113, 0.22);
+  }
+  .alert-success {
+    color: var(--success);
+    background-color: rgba(122, 232, 162, 0.1);
+    border-color: rgba(122, 232, 162, 0.22);
+  }
+}
+
+/* Section heading used above every list on the events board and dashboard. */
+.eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
 }

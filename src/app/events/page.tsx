@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
+import SiteNav from '@/components/SiteNav'
 import EventCard from './EventCard'
+import { eventPhase, registrationDeadline, type EventRow, type MyRegistration } from '@/lib/events'
 
 export const metadata = { title: 'Events — CESA' }
 export const dynamic = 'force-dynamic'
@@ -11,46 +13,70 @@ export default async function EventsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/')
 
-  const { data: events } = await supabase.from('events').select('*').order('starts_at', { ascending: true })
+  const [{ data: events }, { data: regs }] = await Promise.all([
+    supabase.from('events').select('*').order('starts_at', { ascending: true }),
+    supabase.rpc('get_my_registrations'),
+  ])
 
-  // RLS limits this to teams the signed-in user created or belongs to, so no
-  // extra filtering by user id is needed — see event_teams_read_own in the
-  // migration.
-  const { data: myTeams } = await supabase
-    .from('event_teams')
-    .select('event_id, name, event_team_members!inner(status, user_id)')
-    .eq('event_team_members.user_id', user.id)
+  const all = (events ?? []) as EventRow[]
+  const byEvent = new Map<string, MyRegistration>()
+  for (const r of (regs ?? []) as MyRegistration[]) byEvent.set(r.event_id, r)
 
-  const myStatusByEvent = new Map<string, string>()
-  for (const t of myTeams ?? []) {
-    const status = (t.event_team_members as unknown as { status: string }[])[0]?.status
-    if (status) myStatusByEvent.set(t.event_id, status)
-  }
-
-  // This is a Server Component: it renders once per request rather than being
-  // re-rendered by React on the client, so there is no hydration mismatch or
-  // concurrent-render risk from reading the clock here — the purity rule is
-  // guarding against a client-render concern that does not apply server-side.
+  // Server Component: this renders once per request, so reading the clock here
+  // carries none of the hydration/concurrent-render risk the purity rule
+  // guards against on the client.
   // eslint-disable-next-line react-hooks/purity -- Server Component, computed once per request; see above
   const now = Date.now()
-  const all = events ?? []
-  const upcoming = all.filter((e) => new Date(e.starts_at).getTime() > now)
-  const ongoing = all.filter((e) => new Date(e.starts_at).getTime() <= now && new Date(e.ends_at).getTime() >= now)
-  const joined = all.filter((e) => myStatusByEvent.get(e.id) === 'accepted')
+
+  const mine = all.filter((e) => byEvent.has(e.id))
+  const live = all.filter((e) => eventPhase(e, now) === 'live' && !byEvent.has(e.id))
+  const open = all.filter(
+    (e) => eventPhase(e, now) === 'upcoming' && registrationDeadline(e).getTime() > now && !byEvent.has(e.id),
+  )
+  const closed = all.filter(
+    (e) => eventPhase(e, now) === 'upcoming' && registrationDeadline(e).getTime() <= now && !byEvent.has(e.id),
+  )
+  const past = all.filter((e) => eventPhase(e, now) === 'past' && !byEvent.has(e.id))
+
+  const pendingInvites = [...byEvent.values()].filter((r) => r.my_status === 'invited').length
 
   return (
-    <div className="min-h-screen bg-[#130F0E] text-[#F3E9E8] p-8">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)]">Events</h1>
-          <Link href="/dashboard" className="text-sm text-[#A68F8C] hover:text-white">
-            ← Dashboard
-          </Link>
+    <div className="min-h-screen px-6 sm:px-8">
+      <SiteNav active="events" />
+
+      <div className="mx-auto max-w-5xl pb-16">
+        <div className="mb-10">
+          <h1 className="font-[family-name:var(--font-space-grotesk)] text-4xl font-bold tracking-tight text-[var(--text-bright)]">
+            Events
+          </h1>
+          <p className="mt-2 text-[var(--text-muted)]">
+            Register, build your team, and track everything you have joined.
+          </p>
+
+          {pendingInvites > 0 && (
+            <Link
+              href="/dashboard"
+              className="mt-4 inline-flex items-center gap-2 rounded-xl border border-[var(--warning)]/25 bg-[var(--warning)]/10 px-4 py-2.5 text-sm font-semibold text-[var(--warning)] transition-colors hover:bg-[var(--warning)]/15"
+            >
+              {pendingInvites} team invitation{pendingInvites === 1 ? '' : 's'} waiting for your answer →
+            </Link>
+          )}
         </div>
 
-        <Section title="Happening now" events={ongoing} myStatusByEvent={myStatusByEvent} empty="Nothing is running right now." />
-        <Section title="Upcoming" events={upcoming} myStatusByEvent={myStatusByEvent} empty="No upcoming events yet — check back soon." />
-        <Section title="Your events" events={joined} myStatusByEvent={myStatusByEvent} empty="You haven't joined an event yet." />
+        {all.length === 0 && (
+          <div className="card p-10 text-center">
+            <p className="font-semibold text-white">No events published yet</p>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Check back soon — new CESA events are posted here through the year.
+            </p>
+          </div>
+        )}
+
+        <Section title="Your events" events={mine} regs={byEvent} now={now} />
+        <Section title="Happening now" events={live} regs={byEvent} now={now} />
+        <Section title="Open for registration" events={open} regs={byEvent} now={now} />
+        <Section title="Registration closed" events={closed} regs={byEvent} now={now} />
+        <Section title="Past events" events={past} regs={byEvent} now={now} />
       </div>
     </div>
   )
@@ -59,26 +85,28 @@ export default async function EventsPage() {
 function Section({
   title,
   events,
-  myStatusByEvent,
-  empty,
+  regs,
+  now,
 }: {
   title: string
-  events: { id: string; title: string; description: string; starts_at: string; ends_at: string; location: string | null }[]
-  myStatusByEvent: Map<string, string>
-  empty: string
+  events: EventRow[]
+  regs: Map<string, MyRegistration>
+  now: number
 }) {
+  if (events.length === 0) return null
+
   return (
     <section className="mb-10">
-      <h2 className="text-sm font-bold uppercase tracking-wider text-[#8C7A77] mb-3">{title}</h2>
-      {events.length === 0 ? (
-        <p className="text-[#A68F8C] text-sm">{empty}</p>
-      ) : (
-        <div className="grid md:grid-cols-2 gap-4">
-          {events.map((e) => (
-            <EventCard key={e.id} event={e} status={myStatusByEvent.get(e.id) ?? null} />
-          ))}
-        </div>
-      )}
+      <div className="mb-4 flex items-center gap-3">
+        <h2 className="eyebrow">{title}</h2>
+        <span className="text-xs font-bold text-[var(--text-faint)]">{events.length}</span>
+        <div className="h-px flex-1 bg-[var(--border)]" />
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        {events.map((e) => (
+          <EventCard key={e.id} event={e} registration={regs.get(e.id) ?? null} now={now} />
+        ))}
+      </div>
     </section>
   )
 }

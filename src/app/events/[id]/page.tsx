@@ -1,15 +1,25 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
+import SiteNav from '@/components/SiteNav'
 import RegisterForm from './RegisterForm'
-import TeamRoster from './TeamRoster'
+import TeamPanel from './TeamPanel'
+import {
+  eventPhase,
+  formatDateRange,
+  registrationDeadline,
+  teamSizeLabel,
+  timeUntil,
+  type EventRow,
+  type EventTeam,
+} from '@/lib/events'
 
 export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
-  const { data } = await supabase.from('events').select('title').eq('id', id).single()
+  const { data } = await supabase.from('events').select('title').eq('id', id).maybeSingle()
   return { title: data ? `${data.title} — CESA` : 'Event — CESA' }
 }
 
@@ -19,59 +29,119 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/')
 
-  const { data: event } = await supabase.from('events').select('*').eq('id', id).single()
-  if (!event) notFound()
+  const [{ data: eventRow }, { data: teamJson }] = await Promise.all([
+    supabase.from('events').select('*').eq('id', id).maybeSingle(),
+    // Membership-based, not "did I create it" — joining a friend's team used to
+    // leave you looking unregistered, with the register form still offered.
+    supabase.rpc('get_event_team', { p_event_id: id }),
+  ])
 
-  // RLS: this only returns a row if the signed-in user created the team or is
-  // on its roster — so "no row" genuinely means "not registered yet."
-  const { data: myTeam } = await supabase
-    .from('event_teams')
-    .select('id, name, created_by, event_team_members(id, status, user_id, profiles(username, full_name))')
-    .eq('event_id', id)
-    .eq('created_by', user.id)
-    .maybeSingle()
+  if (!eventRow) notFound()
+  const event = eventRow as EventRow
+  const team = (teamJson ?? null) as EventTeam | null
 
-  // Server Component — renders once per request, so reading the clock here
-  // carries none of the hydration/concurrent-render risk this rule guards
-  // against on the client.
-  // eslint-disable-next-line react-hooks/purity -- Server Component, computed once per request; see above
+  // eslint-disable-next-line react-hooks/purity -- Server Component, computed once per request
   const now = Date.now()
-  const registrationOpen =
-    new Date(event.registration_closes_at ?? event.starts_at).getTime() > now
+  const phase = eventPhase(event, now)
+  const deadline = registrationDeadline(event)
+  const closesIn = timeUntil(deadline, now)
+  const registrationOpen = deadline.getTime() > now
 
   return (
-    <div className="min-h-screen bg-[#130F0E] text-[#F3E9E8] p-8">
-      <div className="max-w-2xl mx-auto">
-        <Link href="/events" className="text-sm text-[#A68F8C] hover:text-white">
+    <div className="min-h-screen px-6 sm:px-8">
+      <SiteNav active="events" />
+
+      <div className="mx-auto max-w-3xl pb-20">
+        <Link href="/events" className="text-sm text-[var(--text-muted)] transition-colors hover:text-white">
           ← All events
         </Link>
 
-        <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] mt-3 mb-2">{event.title}</h1>
-        <p className="text-[#8C7A77] text-sm mb-1">
-          {new Date(event.starts_at).toLocaleString()} – {new Date(event.ends_at).toLocaleString()}
-        </p>
-        {event.location && <p className="text-[#8C7A77] text-sm mb-4">{event.location}</p>}
-        <p className="text-[#D1C2C0] whitespace-pre-wrap mb-8">{event.description}</p>
-
-        {myTeam ? (
-          <TeamRoster
-            eventId={id}
-            team={{
-              id: myTeam.id,
-              name: myTeam.name,
-              members: (myTeam.event_team_members ?? []).map((m) => ({
-                id: m.id,
-                status: m.status,
-                username: (m.profiles as unknown as { username: string } | null)?.username ?? '(deleted user)',
-              })),
-            }}
-          />
-        ) : registrationOpen ? (
-          <RegisterForm eventId={id} maxTeamSize={event.max_team_size} />
-        ) : (
-          <p className="text-[#A68F8C]">Registration for this event is closed.</p>
+        {event.banner_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={event.banner_url} alt="" className="mt-4 h-48 w-full rounded-2xl object-cover" />
         )}
+
+        <div className="mt-5 flex flex-wrap items-center gap-2">
+          {phase === 'live' && (
+            <span className="pill bg-[var(--success)]/12 text-[var(--success)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--success)]" />
+              Happening now
+            </span>
+          )}
+          {phase === 'past' && <span className="pill bg-white/5 text-[var(--text-faint)]">Ended</span>}
+          <span className="pill bg-white/5 text-[var(--text-muted)]">
+            {teamSizeLabel(event.min_team_size, event.max_team_size)}
+          </span>
+          {registrationOpen && closesIn && (
+            <span className="pill bg-[var(--accent)]/12 text-[var(--accent)]">Registration closes in {closesIn}</span>
+          )}
+          {!registrationOpen && phase !== 'past' && (
+            <span className="pill bg-white/5 text-[var(--text-faint)]">Registration closed</span>
+          )}
+        </div>
+
+        <h1 className="mt-3 font-[family-name:var(--font-space-grotesk)] text-3xl font-bold tracking-tight text-[var(--text-bright)] sm:text-4xl">
+          {event.title}
+        </h1>
+
+        <dl className="mt-6 grid gap-4 sm:grid-cols-3">
+          <Meta label="When" value={formatDateRange(event.starts_at, event.ends_at)} />
+          <Meta label="Where" value={event.location || 'To be announced'} />
+          <Meta
+            label="Registration closes"
+            value={deadline.toLocaleString(undefined, {
+              day: 'numeric',
+              month: 'short',
+              hour: 'numeric',
+              minute: '2-digit',
+            })}
+          />
+        </dl>
+
+        {event.description && (
+          <div className="mt-8">
+            <h2 className="eyebrow mb-2">About</h2>
+            <p className="whitespace-pre-wrap leading-relaxed text-[#d1c2c0]">{event.description}</p>
+          </div>
+        )}
+
+        <div className="mt-10">
+          {team ? (
+            <TeamPanel
+              eventId={id}
+              team={team}
+              minTeamSize={event.min_team_size}
+              maxTeamSize={event.max_team_size}
+              registrationOpen={registrationOpen}
+              eventStarted={phase !== 'upcoming'}
+            />
+          ) : registrationOpen ? (
+            <RegisterForm
+              eventId={id}
+              minTeamSize={event.min_team_size}
+              maxTeamSize={event.max_team_size}
+            />
+          ) : (
+            <div className="card p-6 text-center">
+              <p className="font-semibold text-white">Registration is closed</p>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">
+                {phase === 'past'
+                  ? 'This event has already finished.'
+                  : 'The deadline for this event has passed.'}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
+    </div>
+  )
+}
+
+function Meta({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="card p-4">
+      <dt className="label">{label}</dt>
+      <dd className="mt-1 text-sm text-[var(--text)]">{value}</dd>
     </div>
   )
 }

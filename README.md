@@ -16,35 +16,61 @@ admin panel for managing events and rosters.
    - `ADMIN_USERNAME`, `ADMIN_PASSWORD` — the separate admin login, unrelated to
      any member's account. Pick your own before deploying.
 
-2. **Run the migration** — `supabase/migrations/0001_events.sql` in the
-   Supabase SQL editor (or `supabase db push` if you use the CLI). It assumes
-   `public.profiles(id, username, full_name, avatar_url, role)` already exists
-   — the table the signup flow in `app/page.tsx` already writes to.
+2. **Run the migrations, in order** — `supabase/migrations/0001_events.sql`
+   then `0002_team_flow.sql`, in the Supabase SQL editor (or `supabase db
+   push` if you use the CLI). They assume `public.profiles(id, username,
+   full_name, avatar_url, role)` already exists — the table the signup flow in
+   `app/page.tsx` already writes to. Both are idempotent.
 
 3. `npm install && npm run dev`.
 
+## The registration flow
+
+Modelled on how Unstop handles team events: **register first, build the team
+after.**
+
+1. **Register** (`/events/[id]`) — pick a team name and you are in. Your seat
+   is held immediately; nothing else is required at this point. On a solo event
+   (max team size 1) there is no team name to invent — one button.
+2. **Invite** — the team page has an **Invite a friend** button with a username
+   typeahead. Only the team leader manages the roster. Pending invites hold a
+   seat; declined ones release theirs, and a person who declined can be asked
+   again.
+3. **Confirm** — the registration is *provisional* until `min_team_size`
+   members have **accepted**. Until then every surface shows "N more to
+   confirm" with a progress bar; once the threshold is met the team reads
+   "Registration confirmed".
+
+A member can leave a team and a leader can cancel the registration outright,
+any time before the event starts. Nobody can be on two teams for the same
+event — enforced at registration, at invite time, and again at the moment an
+invite is accepted.
+
 ## What's here
 
-- **`/events`** — Happening now / Upcoming / Your events. Registering opens a
-  team (a name you pick) and can invite teammates by username in the same
-  step; `/events/[id]` also lets an already-registered member invite more
-  people afterwards.
-- **Notifications**, on `/dashboard` — pending team invitations, with
-  Accept/Decline. Accepting is what moves an event from "invited" to
-  "your events."
+- **`/events`** — Your events, Happening now, Open for registration,
+  Registration closed, Past. Each card carries the team's confirmation
+  progress.
+- **`/events/[id]`** — the event, then either the registration form or the team
+  panel (roster, invite button, withdraw).
+- **`/dashboard`** — notification centre for pending invitations, plus every
+  registration with its confirmation state.
 - **`/admin`** — a separate login (`ADMIN_USERNAME`/`ADMIN_PASSWORD`, an
-  8-hour session cookie). From `/admin/events`: create, edit, and delete
-  events; per event, `/admin/events/[id]/teams` lists every registered team
-  and lets an admin rename a team, add or remove any member directly (no
-  invite needed), or remove the whole team.
+  8-hour session cookie). From `/admin/events`: create, edit, and delete events
+  (including min/max team size); per event, `/admin/events/[id]/teams` lists
+  every registered team with its confirmed/forming status, and lets an admin
+  rename a team, add or remove any member directly (no invite needed), or
+  remove the whole team.
 
-Registration writes (creating a team, inviting, accepting/declining) go
-through three Postgres RPCs in the migration
-(`register_for_event`/`invite_to_team`/`respond_to_invite`) rather than direct
-table writes — a registration is "create the team, add me as accepted, add
-every invite" as one atomic step, which plain RLS policies can't express on
-their own. Admin writes go through the service-role client instead, bypassing
-RLS entirely, since an admin session isn't a Supabase Auth user at all.
+Every member-facing read and write goes through a SECURITY DEFINER Postgres
+function rather than a direct table query. Writes need it because each step has
+to re-check the deadline, the team's capacity and the one-team-per-event rule
+against live data in a single statement, which RLS policies cannot express.
+Reads need it because the invitation feed has to show *another member's*
+username, and `profiles` is not readable member-to-member — the functions
+return exactly the columns the UI needs and never the email column. Admin
+writes go through the service-role client instead, bypassing RLS entirely,
+since an admin session isn't a Supabase Auth user at all.
 
 ---
 
