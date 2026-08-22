@@ -33,7 +33,8 @@ export async function updateSession(request: NextRequest) {
 
   // Define protected and auth routes
   const isAuthRoute = request.nextUrl.pathname === '/' || request.nextUrl.pathname.startsWith('/auth')
-  const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard')
+  const isProtectedRoute =
+    request.nextUrl.pathname.startsWith('/dashboard') || request.nextUrl.pathname.startsWith('/events')
 
   if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone()
@@ -44,6 +45,19 @@ export async function updateSession(request: NextRequest) {
   if (user && request.nextUrl.pathname === '/') {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
+    return NextResponse.redirect(url)
+  }
+
+  // /admin is a completely separate credential from Supabase Auth (see
+  // lib/adminAuth.ts), and its HMAC check needs Node's `crypto` module, which
+  // Edge middleware cannot use. This is only the coarse gate — "is there even
+  // a cesa_admin cookie" — so a stale or empty cookie is bounced to the login
+  // page immediately; the real verification happens in each /admin page
+  // (Node runtime) via isAdmin().
+  const isAdminArea = request.nextUrl.pathname.startsWith('/admin') && request.nextUrl.pathname !== '/admin'
+  if (isAdminArea && !request.cookies.get('cesa_admin')?.value) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/admin'
     return NextResponse.redirect(url)
   }
 
