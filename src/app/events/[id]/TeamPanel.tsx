@@ -51,7 +51,7 @@ export default function TeamPanel({
   if (me?.status === 'invited') {
     const leader = team.members.find((m) => m.isLeader)
     return (
-      <div className="card p-6">
+      <div className="glass p-6">
         <span className="pill mb-3 bg-[var(--warning)]/12 text-[var(--warning)]">Invitation pending</span>
         <h2 className="font-[family-name:var(--font-space-grotesk)] text-xl font-bold text-white">
           @{leader?.username ?? 'Someone'} invited you to {team.name}
@@ -87,7 +87,7 @@ export default function TeamPanel({
   }
 
   return (
-    <div className="card p-6">
+    <div className="glass p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="eyebrow mb-1">Your team</h2>

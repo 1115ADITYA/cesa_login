@@ -2,85 +2,121 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { isAdmin } from '@/lib/adminAuth'
 import { createAdminClient } from '@/utils/supabase/admin'
-import AdminNav from '../AdminNav'
+import AdminShell, { AdminHeader } from '../AdminShell'
 import { deleteEvent } from '../actions'
 import DeleteEventButton from './DeleteEventButton'
+import { formatDateRange, teamSizeLabel, type EventRow } from '@/lib/events'
 
 export const metadata = { title: 'Events — Admin', robots: { index: false } }
 export const dynamic = 'force-dynamic'
 
-function eventStatus(startsAt: string, endsAt: string): { label: string; tone: string } {
-  const now = Date.now()
-  const start = new Date(startsAt).getTime()
-  const end = new Date(endsAt).getTime()
-  if (now < start) return { label: 'Upcoming', tone: 'text-[#7AA2E8]' }
-  if (now <= end) return { label: 'Ongoing', tone: 'text-[#7AE8A2]' }
-  return { label: 'Past', tone: 'text-[#8C7A77]' }
-}
+type TeamRow = { event_id: string; id: string }
+type MemberRow = { team_id: string; status: string }
 
 export default async function AdminEventsPage() {
   if (!(await isAdmin())) redirect('/admin')
 
   const supabase = createAdminClient()
-  const { data: events } = await supabase
-    .from('events')
-    .select('id, title, starts_at, ends_at, location')
-    .order('starts_at', { ascending: false })
+  const [{ data: events }, { data: teams }, { data: members }] = await Promise.all([
+    supabase.from('events').select('*').order('starts_at', { ascending: false }),
+    supabase.from('event_teams').select('id, event_id'),
+    supabase.from('event_team_members').select('team_id, status'),
+  ])
 
-  const { data: teamCounts } = await supabase.from('event_teams').select('event_id')
-  const countByEvent = new Map<string, number>()
-  for (const row of teamCounts ?? []) {
-    countByEvent.set(row.event_id, (countByEvent.get(row.event_id) ?? 0) + 1)
+  // Confirmed vs still-forming per event — the number an organiser actually
+  // needs before the day, and which the old "N team(s) registered" line hid.
+  const acceptedByTeam = new Map<string, number>()
+  for (const m of (members ?? []) as MemberRow[]) {
+    if (m.status === 'accepted') acceptedByTeam.set(m.team_id, (acceptedByTeam.get(m.team_id) ?? 0) + 1)
+  }
+  const teamsByEvent = new Map<string, string[]>()
+  for (const t of (teams ?? []) as TeamRow[]) {
+    teamsByEvent.set(t.event_id, [...(teamsByEvent.get(t.event_id) ?? []), t.id])
   }
 
-  return (
-    <div className="min-h-screen bg-[#130F0E] text-[#F3E9E8] p-8">
-      <div className="max-w-5xl mx-auto">
-        <AdminNav active="events" />
+  const all = (events ?? []) as EventRow[]
+  // eslint-disable-next-line react-hooks/purity -- Server Component, resolved once per request
+  const now = Date.now()
 
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold font-[family-name:var(--font-space-grotesk)]">Events</h1>
-          <Link
-            href="/admin/events/new"
-            className="bg-gradient-to-r from-[#D16475] to-[#E87A8C] text-white font-bold text-sm px-4 py-2.5 rounded-xl"
-          >
+  return (
+    <AdminShell>
+      <AdminHeader
+        title="Events"
+        subtitle={all.length === 0 ? 'Nothing published yet.' : `${all.length} event${all.length === 1 ? '' : 's'}`}
+        action={
+          <Link href="/admin/events/new" className="btn btn-primary">
             + New event
           </Link>
-        </div>
+        }
+      />
 
-        {!events?.length ? (
-          <p className="text-[#A68F8C]">No events yet.</p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {events.map((e) => {
-              const status = eventStatus(e.starts_at, e.ends_at)
-              return (
-                <div key={e.id} className="bg-[#1D1716] p-5 rounded-2xl border border-white/5 flex items-center justify-between flex-wrap gap-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h2 className="font-bold text-white">{e.title}</h2>
-                      <span className={`text-xs font-bold uppercase tracking-wider ${status.tone}`}>{status.label}</span>
-                    </div>
-                    <p className="text-[#A68F8C] text-sm">
-                      {new Date(e.starts_at).toLocaleString()} {e.location ? `· ${e.location}` : ''} ·{' '}
-                      {countByEvent.get(e.id) ?? 0} team(s) registered
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 text-sm font-semibold">
-                    <Link href={`/admin/events/${e.id}/teams`} className="text-[#E87A8C] hover:underline">
-                      Teams
-                    </Link>
-                    <Link href={`/admin/events/${e.id}/edit`} className="text-[#D1C2C0] hover:text-white">
-                      Edit
-                    </Link>
-                    <DeleteEventButton eventId={e.id} action={deleteEvent} />
-                  </div>
+      {all.length === 0 ? (
+        <div className="glass px-6 py-12 text-center">
+          <p className="font-semibold text-white">No events yet</p>
+          <p className="mt-1.5 text-sm text-[var(--text-muted)]">
+            Create one and it appears on every member&apos;s events board straight away.
+          </p>
+          <Link href="/admin/events/new" className="btn btn-primary mt-5">
+            Create the first event
+          </Link>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {all.map((e) => {
+            const ids = teamsByEvent.get(e.id) ?? []
+            const confirmed = ids.filter((id) => (acceptedByTeam.get(id) ?? 0) >= e.min_team_size).length
+            const status = eventStatus(e.starts_at, e.ends_at, now)
+            const start = new Date(e.starts_at)
+
+            return (
+              <div key={e.id} className="glass card-hover flex flex-wrap items-center gap-4 p-4 sm:p-5">
+                <div className="flex w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-gradient-to-b from-[var(--accent-deep)]/18 to-[var(--accent)]/6 py-3">
+                  <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[var(--accent-light)]">
+                    {start.toLocaleDateString(undefined, { month: 'short' })}
+                  </span>
+                  <span className="heading text-2xl leading-none">{start.getDate()}</span>
                 </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-    </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-bold text-white">{e.title}</h2>
+                    <span className={`pill ${status.tone}`}>{status.label}</span>
+                  </div>
+                  <p className="mt-1 text-sm text-[var(--text-muted)]">
+                    {formatDateRange(e.starts_at, e.ends_at)}
+                    {e.location ? ` · ${e.location}` : ''} · {teamSizeLabel(e.min_team_size, e.max_team_size)}
+                  </p>
+                  <p className="mt-1.5 text-xs text-[var(--text-faint)]">
+                    <span className="font-bold text-[var(--text)]">{ids.length}</span> registered ·{' '}
+                    <span className="font-bold text-[var(--success)]">{confirmed}</span> confirmed
+                    {ids.length - confirmed > 0 && (
+                      <span className="text-[var(--warning)]"> · {ids.length - confirmed} still forming</span>
+                    )}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <Link href={`/admin/events/${e.id}/teams`} className="btn btn-ghost !px-3 !py-2 !text-xs">
+                    Teams
+                  </Link>
+                  <Link href={`/admin/events/${e.id}/edit`} className="btn btn-ghost !px-3 !py-2 !text-xs">
+                    Edit
+                  </Link>
+                  <DeleteEventButton eventId={e.id} action={deleteEvent} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </AdminShell>
   )
+}
+
+function eventStatus(startsAt: string, endsAt: string, now: number) {
+  const start = new Date(startsAt).getTime()
+  const end = new Date(endsAt).getTime()
+  if (now < start) return { label: 'Upcoming', tone: 'bg-[var(--info)]/12 text-[var(--info)]' }
+  if (now <= end) return { label: 'Live', tone: 'bg-[var(--success)]/12 text-[var(--success)]' }
+  return { label: 'Past', tone: 'bg-white/5 text-[var(--text-faint)]' }
 }

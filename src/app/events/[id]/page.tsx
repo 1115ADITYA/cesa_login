@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
-import SiteNav from '@/components/SiteNav'
+import AppShell from '@/components/AppShell'
 import RegisterForm from './RegisterForm'
 import TeamPanel from './TeamPanel'
 import {
@@ -48,10 +48,8 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   const registrationOpen = deadline.getTime() > now
 
   return (
-    <div className="min-h-screen px-6 sm:px-8">
-      <SiteNav active="events" />
-
-      <div className="mx-auto max-w-3xl pb-20">
+    <AppShell>
+      <div className="mx-auto max-w-3xl">
         <Link href="/events" className="text-sm text-[var(--text-muted)] transition-colors hover:text-white">
           ← All events
         </Link>
@@ -80,7 +78,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
           )}
         </div>
 
-        <h1 className="mt-3 font-[family-name:var(--font-space-grotesk)] text-3xl font-bold tracking-tight text-[var(--text-bright)] sm:text-4xl">
+        <h1 className="on-art mt-3 font-[family-name:var(--font-space-grotesk)] text-3xl font-bold tracking-tight text-[var(--text-bright)] sm:text-4xl">
           {event.title}
         </h1>
 
@@ -101,7 +99,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         {event.description && (
           <div className="mt-8">
             <h2 className="eyebrow mb-2">About</h2>
-            <p className="whitespace-pre-wrap leading-relaxed text-[#d1c2c0]">{event.description}</p>
+            <p className="on-art whitespace-pre-wrap leading-relaxed text-[var(--text)]">{event.description}</p>
           </div>
         )}
 
@@ -122,7 +120,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
               maxTeamSize={event.max_team_size}
             />
           ) : (
-            <div className="card p-6 text-center">
+            <div className="glass p-6 text-center">
               <p className="font-semibold text-white">Registration is closed</p>
               <p className="mt-1 text-sm text-[var(--text-muted)]">
                 {phase === 'past'
@@ -133,13 +131,13 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
           )}
         </div>
       </div>
-    </div>
+    </AppShell>
   )
 }
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="card p-4">
+    <div className="glass p-4">
       <dt className="label">{label}</dt>
       <dd className="mt-1 text-sm text-[var(--text)]">{value}</dd>
     </div>
