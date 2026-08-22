@@ -10,6 +10,7 @@ type EventDefaults = {
   startsAt?: string
   endsAt?: string
   registrationClosesAt?: string
+  minTeamSize?: number | null
   maxTeamSize?: number | null
 }
 
@@ -55,12 +56,22 @@ export default function EventForm({
         </Field>
       </div>
 
+      <Field label="Registration closes (blank = when the event starts)">
+        <input
+          type="datetime-local"
+          name="registrationClosesAt"
+          defaultValue={toLocalInput(defaults?.registrationClosesAt)}
+          className={inputClass}
+        />
+      </Field>
+
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Registration closes (optional)">
+        <Field label="Min team size">
           <input
-            type="datetime-local"
-            name="registrationClosesAt"
-            defaultValue={toLocalInput(defaults?.registrationClosesAt)}
+            type="number"
+            min={1}
+            name="minTeamSize"
+            defaultValue={defaults?.minTeamSize ?? 1}
             className={inputClass}
           />
         </Field>
@@ -68,6 +79,10 @@ export default function EventForm({
           <input type="number" min={1} name="maxTeamSize" defaultValue={defaults?.maxTeamSize ?? ''} className={inputClass} />
         </Field>
       </div>
+      <p className="-mt-2 text-xs text-[#8C7A77]">
+        A team is only <strong className="text-[#D1C2C0]">confirmed</strong> once the minimum number of members have
+        accepted their invitations. Set both to 1 for a solo event — participants then register without naming a team.
+      </p>
 
       <Field label="Location (optional)">
         <input name="location" defaultValue={defaults?.location} className={inputClass} />

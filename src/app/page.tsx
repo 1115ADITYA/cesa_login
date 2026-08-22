@@ -20,42 +20,36 @@ export default function AuthPage() {
   const [fullName, setFullName] = useState('')
   const [username, setUsername] = useState('')
   
-  // Live username checking states
-  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
+  // Live username checking. The result is stored tagged with the username it
+  // answers and the status is derived from it, so a slow reply for an earlier
+  // keystroke cannot land after a newer one and mislabel the field.
+  const [usernameCheck, setUsernameCheck] = useState<{ username: string; available: boolean } | null>(null)
 
-  // Live Check Username Effect
+  const usernameStatus: 'idle' | 'checking' | 'available' | 'taken' =
+    view !== 'signup' || username.length < 3
+      ? 'idle'
+      : usernameCheck?.username === username
+        ? usernameCheck.available
+          ? 'available'
+          : 'taken'
+        : 'checking'
+
   useEffect(() => {
-    if (view !== 'signup' || !username) {
-      setUsernameStatus('idle')
-      return
-    }
+    if (view !== 'signup' || username.length < 3) return
 
+    let live = true
     // Debounce the check so it doesn't spam the database on every single keystroke
-    setUsernameStatus('checking')
     const timer = setTimeout(async () => {
-      // Basic format check
-      if (username.length < 3) {
-        setUsernameStatus('idle')
-        return
-      }
-
       const { data, error } = await supabase.rpc('check_username_available', {
         username_to_check: username
       })
+      if (live && !error) setUsernameCheck({ username, available: data !== false })
+    }, 500)
 
-      if (error) {
-        setUsernameStatus('idle')
-        return
-      }
-
-      if (data === false) {
-        setUsernameStatus('taken')
-      } else {
-        setUsernameStatus('available')
-      }
-    }, 500) // 500ms delay
-
-    return () => clearTimeout(timer)
+    return () => {
+      live = false
+      clearTimeout(timer)
+    }
   }, [username, view, supabase])
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -257,7 +251,7 @@ export default function AuthPage() {
                 </button>
 
                 <p className="text-center text-sm text-[#A68F8C] mt-4">
-                  Don't have an account?{' '}
+                  Don&apos;t have an account?{' '}
                   <button type="button" onClick={() => { setView('signup'); setError(null); setMessage(null) }} className="text-[#E87A8C] font-bold hover:underline underline-offset-4">Sign Up</button>
                 </p>
               </form>
@@ -301,7 +295,7 @@ export default function AuthPage() {
               <form onSubmit={handleForgotPassword} className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <div>
                   <h1 className="font-[family-name:var(--font-space-grotesk)] text-3xl font-bold mb-2 tracking-tight text-[#FDF8F8]">Reset Password</h1>
-                  <p className="text-[#A68F8C] text-sm">Enter your email and we'll send you a link to reset your password.</p>
+                  <p className="text-[#A68F8C] text-sm">Enter your email and we&apos;ll send you a link to reset your password.</p>
                 </div>
                 
                 {error && <div className="text-sm text-red-400 bg-red-400/10 p-3 rounded-xl border border-red-400/20">{error}</div>}

@@ -12,7 +12,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
   const { id } = await params
 
   const supabase = createAdminClient()
-  const { data: event } = await supabase.from('events').select('*').eq('id', id).single()
+  const { data: event } = await supabase.from('events').select('*').eq('id', id).maybeSingle()
   if (!event) notFound()
 
   const boundUpdate = updateEvent.bind(null, id)
@@ -33,6 +33,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
             startsAt: event.starts_at,
             endsAt: event.ends_at,
             registrationClosesAt: event.registration_closes_at ?? '',
+            minTeamSize: event.min_team_size,
             maxTeamSize: event.max_team_size,
           }}
         />

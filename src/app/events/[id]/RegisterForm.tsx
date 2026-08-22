@@ -3,23 +3,35 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { registerForEvent } from '../actions'
+import { teamSizeLabel } from '@/lib/events'
 
-export default function RegisterForm({ eventId, maxTeamSize }: { eventId: string; maxTeamSize: number | null }) {
+/**
+ * Step one, and only step one. Inviting friends used to happen in this same
+ * form, which meant a typo'd username could block someone from registering at
+ * all — and there was no way to add anyone afterwards without re-submitting the
+ * team name. You register first; the roster is built on the next screen.
+ */
+export default function RegisterForm({
+  eventId,
+  minTeamSize,
+  maxTeamSize,
+}: {
+  eventId: string
+  minTeamSize: number
+  maxTeamSize: number | null
+}) {
   const router = useRouter()
+  const solo = maxTeamSize === 1
   const [teamName, setTeamName] = useState('')
-  const [invites, setInvites] = useState<string[]>([''])
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
-
-  const inviteCap = maxTeamSize ? maxTeamSize - 1 : null
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     startTransition(async () => {
-      const usernames = invites.map((u) => u.trim()).filter(Boolean)
-      const result = await registerForEvent(eventId, teamName, usernames)
-      if (result?.error) {
+      const result = await registerForEvent(eventId, teamName)
+      if ('error' in result) {
         setError(result.error)
         return
       }
@@ -28,63 +40,75 @@ export default function RegisterForm({ eventId, maxTeamSize }: { eventId: string
   }
 
   return (
-    <form onSubmit={submit} className="bg-[#1D1716] p-6 rounded-2xl border border-white/5 flex flex-col gap-4">
-      <h2 className="font-bold text-white">Register your team</h2>
-      {error && <div className="text-sm text-red-400 bg-red-400/10 p-3 rounded-xl border border-red-400/20">{error}</div>}
-
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-bold text-[#8C7A77] uppercase tracking-wider">Team name</label>
-        <input
-          value={teamName}
-          onChange={(e) => setTeamName(e.target.value)}
-          required
-          minLength={2}
-          className="p-3 rounded-xl border border-white/5 bg-black/30 text-sm outline-none focus:border-[#E87A8C]"
-        />
+    <form onSubmit={submit} className="card flex flex-col gap-5 p-6">
+      <div>
+        <h2 className="font-[family-name:var(--font-space-grotesk)] text-xl font-bold text-white">
+          {solo ? 'Register for this event' : 'Register your team'}
+        </h2>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">
+          {solo
+            ? 'This is a solo event — one click and you are in.'
+            : `${teamSizeLabel(minTeamSize, maxTeamSize)}. Register now, then invite your friends — your spot is held while they reply.`}
+        </p>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-bold text-[#8C7A77] uppercase tracking-wider">
-          Invite friends by username {maxTeamSize ? `(up to ${inviteCap} more — max team size ${maxTeamSize})` : '(optional)'}
-        </label>
-        {invites.map((v, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <span className="text-[#8C7A77]">@</span>
-            <input
-              value={v}
-              onChange={(e) => setInvites((prev) => prev.map((p, j) => (j === i ? e.target.value : p)))}
-              placeholder="friend_username"
-              className="flex-1 p-2.5 rounded-xl border border-white/5 bg-black/30 text-sm outline-none focus:border-[#E87A8C]"
-            />
-            {invites.length > 1 && (
-              <button
-                type="button"
-                onClick={() => setInvites((prev) => prev.filter((_, j) => j !== i))}
-                className="text-[#8C7A77] hover:text-red-400 text-sm"
-              >
-                remove
-              </button>
-            )}
-          </div>
-        ))}
-        {(inviteCap === null || invites.length < inviteCap) && (
-          <button
-            type="button"
-            onClick={() => setInvites((prev) => [...prev, ''])}
-            className="text-xs font-bold text-[#E87A8C] self-start mt-1"
-          >
-            + Add another
-          </button>
-        )}
-      </div>
+      {!solo && <Steps minTeamSize={minTeamSize} />}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="mt-2 bg-gradient-to-r from-[#D16475] to-[#E87A8C] text-white font-bold py-3 rounded-xl disabled:opacity-50"
-      >
-        {pending ? 'Registering…' : 'Register'}
+      {error && <div className="alert alert-error">{error}</div>}
+
+      {!solo && (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="teamName" className="label">
+            Team name
+          </label>
+          <input
+            id="teamName"
+            value={teamName}
+            onChange={(e) => setTeamName(e.target.value)}
+            required
+            minLength={2}
+            maxLength={60}
+            placeholder="e.g. Byte Me"
+            className="field"
+          />
+          <p className="text-xs text-[var(--text-faint)]">
+            Visible to your teammates and the organisers. You can change it later.
+          </p>
+        </div>
+      )}
+
+      <button type="submit" disabled={pending} className="btn btn-primary !py-3">
+        {pending ? 'Registering…' : solo ? 'Register' : 'Register & pick teammates'}
       </button>
     </form>
+  )
+}
+
+function Steps({ minTeamSize }: { minTeamSize: number }) {
+  const steps = [
+    'Register and name your team',
+    'Invite friends by username',
+    minTeamSize > 1
+      ? `${minTeamSize} members accept — your team is confirmed`
+      : 'They accept — your team is confirmed',
+  ]
+
+  return (
+    <ol className="flex flex-col gap-2.5 rounded-xl bg-[var(--bg-sunken)] p-4">
+      {steps.map((label, i) => (
+        <li key={label} className="flex items-center gap-3 text-sm">
+          <span
+            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+              i === 0 ? 'bg-[var(--accent)] text-white' : 'bg-white/8 text-[var(--text-faint)]'
+            }`}
+          >
+            {i + 1}
+          </span>
+          <span className={i === 0 ? 'font-semibold text-[var(--text-bright)]' : 'text-[var(--text-muted)]'}>
+            {label}
+          </span>
+        </li>
+      ))}
+    </ol>
   )
 }

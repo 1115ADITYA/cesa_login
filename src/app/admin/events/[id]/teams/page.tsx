@@ -14,14 +14,38 @@ export default async function EventTeamsPage({ params }: { params: Promise<{ id:
   const { id: eventId } = await params
 
   const supabase = createAdminClient()
-  const { data: event } = await supabase.from('events').select('id, title').eq('id', eventId).single()
+  const { data: event } = await supabase
+    .from('events')
+    .select('id, title, min_team_size, max_team_size')
+    .eq('id', eventId)
+    .maybeSingle()
   if (!event) notFound()
 
-  const { data: teams } = await supabase
+  // `profiles` must be reached by an explicit FK name: event_team_members
+  // points at it twice (user_id and invited_by), so a bare `profiles(...)`
+  // embed is ambiguous and PostgREST rejects the whole query — which this page
+  // then rendered as the far more convincing "No teams registered yet."
+  const { data: teams, error: teamsError } = await supabase
     .from('event_teams')
-    .select('id, name, created_at, event_team_members(id, status, invited_at, responded_at, profiles(username, full_name))')
+    .select(
+      'id, name, created_at, event_team_members(id, status, invited_at, responded_at, profiles!event_team_members_user_id_fkey(username, full_name))',
+    )
     .eq('event_id', eventId)
     .order('created_at', { ascending: true })
+
+  // Never silently claim an event has no teams because the query failed.
+  if (teamsError) throw new Error(`Could not load teams: ${teamsError.message}`)
+
+  const summary = (teams ?? []).reduce(
+    (acc, t) => {
+      const accepted = (t.event_team_members ?? []).filter((m) => m.status === 'accepted').length
+      acc.total += 1
+      if (accepted >= event.min_team_size) acc.confirmed += 1
+      else acc.forming += 1
+      return acc
+    },
+    { total: 0, confirmed: 0, forming: 0 },
+  )
 
   return (
     <div className="min-h-screen bg-[#130F0E] text-[#F3E9E8] p-8">
@@ -30,7 +54,12 @@ export default async function EventTeamsPage({ params }: { params: Promise<{ id:
         <Link href="/admin/events" className="text-sm text-[#A68F8C] hover:text-white">
           ← All events
         </Link>
-        <h1 className="text-2xl font-bold font-[family-name:var(--font-space-grotesk)] mt-2 mb-6">{event.title} — Teams</h1>
+        <h1 className="text-2xl font-bold font-[family-name:var(--font-space-grotesk)] mt-2 mb-1">{event.title} — Teams</h1>
+        <p className="text-sm text-[#8C7A77] mb-6">
+          {summary.total} registered · <span className="text-[#7AE8A2]">{summary.confirmed} confirmed</span> ·{' '}
+          <span className="text-[#E8C87A]">{summary.forming} still forming</span> · needs{' '}
+          {event.min_team_size} accepted member{event.min_team_size === 1 ? '' : 's'} to confirm
+        </p>
 
         {!teams?.length ? (
           <p className="text-[#A68F8C]">No teams registered yet.</p>
@@ -39,6 +68,8 @@ export default async function EventTeamsPage({ params }: { params: Promise<{ id:
             {teams.map((t) => (
               <TeamRow
                 key={t.id}
+                minTeamSize={event.min_team_size}
+                maxTeamSize={event.max_team_size}
                 team={{
                   id: t.id,
                   name: t.name,

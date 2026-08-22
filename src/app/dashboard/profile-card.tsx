@@ -13,49 +13,54 @@ type Profile = {
   role: string
 }
 
-export function ProfileCard({ profile, userEmail }: { profile: Profile, userEmail: string }) {
+export function ProfileCard({ profile, userEmail }: { profile: Profile | null; userEmail: string }) {
+  // A Google sign-in whose profile insert failed leaves an authenticated user
+  // with no profile row at all. That used to crash the whole dashboard on
+  // `profile.username`; now it degrades to a prompt to pick one, which also
+  // matters because invites are addressed by username.
+  const currentUsername = profile?.username ?? ''
   const [isEditing, setIsEditing] = useState(false)
-  const [newUsername, setNewUsername] = useState(profile.username)
-  const [status, setStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
+  const [newUsername, setNewUsername] = useState(currentUsername)
+  const [checked, setChecked] = useState<{ username: string; available: boolean } | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const supabase = createClient()
 
-  // Live checking username availability
+  // Derived, not stored: the old version wrote this state from inside the
+  // effect, which meant a slow answer for an earlier keystroke could land after
+  // a newer one and label a free username as taken. Tying the result to the
+  // string it answers removes that race.
+  const status: 'idle' | 'checking' | 'available' | 'taken' =
+    newUsername === currentUsername
+      ? 'idle'
+      : newUsername.length < 3
+        ? 'taken'
+        : checked?.username === newUsername
+          ? checked.available
+            ? 'available'
+            : 'taken'
+          : 'checking'
+
   useEffect(() => {
-    if (newUsername === profile.username) {
-      setStatus('idle')
-      return
-    }
-    
-    if (newUsername.length < 3) {
-      setStatus('taken')
-      return
-    }
+    if (newUsername === currentUsername || newUsername.length < 3) return
 
-    const checkUsername = async () => {
-      setStatus('checking')
+    let live = true
+    const timer = setTimeout(async () => {
       const { data, error } = await supabase.rpc('check_username_available', {
-        username_to_check: newUsername
+        username_to_check: newUsername,
       })
-      
-      if (error || !data) {
-        setStatus('taken')
-      } else {
-        setStatus('available')
-      }
-    }
-
-    const timer = setTimeout(() => {
-      checkUsername()
+      if (live) setChecked({ username: newUsername, available: !error && data === true })
     }, 500)
 
-    return () => clearTimeout(timer)
-  }, [newUsername, profile.username, supabase])
+    return () => {
+      live = false
+      clearTimeout(timer)
+    }
+  }, [newUsername, currentUsername, supabase])
 
   const handleSave = async () => {
-    if (status !== 'available' && newUsername !== profile.username) return
-    if (newUsername === profile.username) {
+    if (status !== 'available' && newUsername !== currentUsername) return
+    if (newUsername === currentUsername) {
       setIsEditing(false)
       return
     }
@@ -71,7 +76,7 @@ export function ProfileCard({ profile, userEmail }: { profile: Profile, userEmai
     } else {
       setIsEditing(false)
       setIsSaving(false)
-      setStatus('idle')
+      setChecked(null)
     }
   }
 
@@ -81,7 +86,7 @@ export function ProfileCard({ profile, userEmail }: { profile: Profile, userEmai
         
         {isEditing && (
           <button 
-            onClick={() => { setIsEditing(false); setNewUsername(profile.username); setError(null); setStatus('idle'); }}
+            onClick={() => { setIsEditing(false); setNewUsername(currentUsername); setError(null); setChecked(null); }}
             className="absolute top-0 right-0 text-[#8C7A77] hover:text-white text-sm font-semibold"
           >
             Cancel
@@ -96,9 +101,9 @@ export function ProfileCard({ profile, userEmail }: { profile: Profile, userEmai
           </button>
         )}
 
-        {profile.avatar_url ? (
+        {profile?.avatar_url ? (
           <Image 
-            src={profile.avatar_url} 
+            src={profile?.avatar_url} 
             alt="Profile" 
             width={100} 
             height={100} 
@@ -106,11 +111,11 @@ export function ProfileCard({ profile, userEmail }: { profile: Profile, userEmai
           />
         ) : (
           <div className="w-[100px] h-[100px] rounded-full bg-gradient-to-br from-[#D16475] to-[#E87A8C] flex items-center justify-center text-3xl font-bold mb-4">
-            {profile.full_name?.charAt(0) || userEmail.charAt(0) || 'U'}
+            {profile?.full_name?.charAt(0) || userEmail.charAt(0) || 'U'}
           </div>
         )}
         
-        <h2 className="text-xl font-bold text-white">{profile.full_name || 'User'}</h2>
+        <h2 className="text-xl font-bold text-white">{profile?.full_name || 'User'}</h2>
         
         {isEditing ? (
           <div className="mt-3 w-full flex flex-col gap-2">
@@ -146,13 +151,15 @@ export function ProfileCard({ profile, userEmail }: { profile: Profile, userEmai
             </button>
           </div>
         ) : (
-          <p className="text-[#E87A8C] font-semibold mt-1">@{profile.username}</p>
+          <p className="text-[#E87A8C] font-semibold mt-1">
+            {currentUsername ? `@${currentUsername}` : 'Pick a username so friends can invite you'}
+          </p>
         )}
 
         <p className="text-[#A68F8C] text-sm mt-1">{userEmail}</p>
         
         <div className="mt-6 inline-flex items-center px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-semibold uppercase tracking-wider text-[#D1C2C0]">
-          Role: {profile.role || 'participant'}
+          Role: {profile?.role || 'participant'}
         </div>
       </div>
     </div>

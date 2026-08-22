@@ -1,26 +1,104 @@
 import Link from 'next/link'
+import TeamProgress from '@/components/TeamProgress'
+import {
+  eventPhase,
+  formatDateRange,
+  registrationDeadline,
+  teamSizeLabel,
+  teamState,
+  timeUntil,
+  type EventRow,
+  type MyRegistration,
+} from '@/lib/events'
 
-type Event = { id: string; title: string; description: string; starts_at: string; ends_at: string; location: string | null }
+export default function EventCard({
+  event,
+  registration,
+  now,
+}: {
+  event: EventRow
+  registration: MyRegistration | null
+  now: number
+}) {
+  const phase = eventPhase(event, now)
+  const deadline = registrationDeadline(event)
+  const closesIn = timeUntil(deadline, now)
 
-export default function EventCard({ event, status }: { event: Event; status: string | null }) {
   return (
-    <Link
-      href={`/events/${event.id}`}
-      className="block bg-[#1D1716] p-5 rounded-2xl border border-white/5 hover:border-[#E87A8C]/40 transition-colors"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="font-bold text-white">{event.title}</h3>
-        {status === 'accepted' && (
-          <span className="text-xs font-bold text-[#7AE8A2] bg-[#7AE8A2]/10 px-2 py-1 rounded-full shrink-0">Joined</span>
+    <Link href={`/events/${event.id}`} className="card card-hover flex flex-col overflow-hidden">
+      {event.banner_url && (
+        // Admin-supplied URLs from arbitrary hosts, so plain <img> rather than
+        // next/image — which would need every host allow-listed up front.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={event.banner_url} alt="" className="h-32 w-full object-cover" />
+      )}
+
+      <div className="flex flex-1 flex-col p-5">
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="font-bold leading-snug text-white">{event.title}</h3>
+          <StatusPill phase={phase} registration={registration} />
+        </div>
+
+        {event.description && (
+          <p className="mt-1.5 line-clamp-2 text-sm text-[var(--text-muted)]">{event.description}</p>
         )}
-        {status === 'invited' && (
-          <span className="text-xs font-bold text-[#E8C87A] bg-[#E8C87A]/10 px-2 py-1 rounded-full shrink-0">Invited</span>
+
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-faint)]">
+          <span>{formatDateRange(event.starts_at, event.ends_at)}</span>
+          {event.location && <span>· {event.location}</span>}
+          <span>· {teamSizeLabel(event.min_team_size, event.max_team_size)}</span>
+        </div>
+
+        {registration ? (
+          <div className="mt-4 border-t border-[var(--border)] pt-3">
+            <p className="mb-2 text-xs text-[var(--text-muted)]">
+              Team <span className="font-bold text-[var(--text-bright)]">{registration.team_name}</span>
+            </p>
+            <TeamProgress
+              accepted={registration.accepted_count}
+              pending={registration.pending_count}
+              min={registration.min_team_size}
+              max={registration.max_team_size}
+            />
+          </div>
+        ) : (
+          phase === 'upcoming' && (
+            <p className="mt-4 border-t border-[var(--border)] pt-3 text-xs font-semibold">
+              {closesIn ? (
+                <span className="text-[var(--accent)]">Registration closes in {closesIn}</span>
+              ) : (
+                <span className="text-[var(--text-faint)]">Registration closed</span>
+              )}
+            </p>
+          )
         )}
       </div>
-      <p className="text-[#A68F8C] text-sm mt-1 line-clamp-2">{event.description}</p>
-      <p className="text-[#8C7A77] text-xs mt-3">
-        {new Date(event.starts_at).toLocaleString()} {event.location ? `· ${event.location}` : ''}
-      </p>
     </Link>
   )
+}
+
+function StatusPill({ phase, registration }: { phase: 'upcoming' | 'live' | 'past'; registration: MyRegistration | null }) {
+  if (registration) {
+    const state = teamState(registration)
+    if (state === 'invited') {
+      return <span className="pill shrink-0 bg-[var(--warning)]/12 text-[var(--warning)]">Invited</span>
+    }
+    if (state === 'confirmed') {
+      return <span className="pill shrink-0 bg-[var(--success)]/12 text-[var(--success)]">Confirmed</span>
+    }
+    return <span className="pill shrink-0 bg-[var(--accent)]/12 text-[var(--accent)]">Forming team</span>
+  }
+
+  if (phase === 'live') {
+    return (
+      <span className="pill shrink-0 bg-[var(--success)]/12 text-[var(--success)]">
+        <span className="h-1.5 w-1.5 rounded-full bg-[var(--success)]" />
+        Live
+      </span>
+    )
+  }
+  if (phase === 'past') {
+    return <span className="pill shrink-0 bg-white/5 text-[var(--text-faint)]">Ended</span>
+  }
+  return null
 }

@@ -8,6 +8,8 @@ type Team = { id: string; name: string; members: Member[] }
 export default function TeamRow({
   team,
   eventId,
+  minTeamSize,
+  maxTeamSize,
   renameTeam,
   removeTeam,
   addTeamMember,
@@ -15,6 +17,8 @@ export default function TeamRow({
 }: {
   team: Team
   eventId: string
+  minTeamSize: number
+  maxTeamSize: number | null
   renameTeam: (teamId: string, newName: string) => Promise<void>
   removeTeam: (teamId: string, eventId: string) => Promise<void>
   addTeamMember: (teamId: string, eventId: string, username: string) => Promise<void>
@@ -25,6 +29,10 @@ export default function TeamRow({
   const [newUsername, setNewUsername] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+
+  const accepted = team.members.filter((m) => m.status === 'accepted').length
+  const invited = team.members.filter((m) => m.status === 'invited').length
+  const confirmed = accepted >= minTeamSize
 
   const run = (fn: () => Promise<void>) => {
     setError(null)
@@ -59,8 +67,19 @@ export default function TeamRow({
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-bold text-white">{team.name}</h3>
+            {confirmed ? (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[#7AE8A2]/12 text-[#7AE8A2]">Confirmed</span>
+            ) : (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[#E8C87A]/12 text-[#E8C87A]">
+                Forming — {minTeamSize - accepted} short
+              </span>
+            )}
+            <span className="text-xs text-[#8C7A77]">
+              {accepted}
+              {maxTeamSize ? `/${maxTeamSize}` : ''} accepted{invited > 0 ? `, ${invited} pending` : ''}
+            </span>
             <button className="text-xs text-[#A68F8C] hover:text-white" onClick={() => setEditingName(true)}>
               rename
             </button>
