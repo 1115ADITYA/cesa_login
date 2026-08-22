@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+:root {
+  --font-space-grotesk: 'Space Grotesk', sans-serif;
+}
+
+body {
+  background-color: #07070a;
+  color: #f3f3f6;
+  overflow-x: hidden;
+}
