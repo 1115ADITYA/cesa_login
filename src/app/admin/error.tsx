@@ -10,16 +10,18 @@ import { adminLogout } from './logoutAction'
  */
 export default function AdminError({ error, reset }: { error: Error; reset: () => void }) {
   return (
-    <div className="min-h-screen bg-[#130F0E] text-[#F3E9E8] flex items-center justify-center p-6">
-      <div className="w-full max-w-md bg-[#1D1716] p-8 rounded-2xl border border-white/5">
-        <h1 className="font-[family-name:var(--font-space-grotesk)] text-xl font-bold mb-2">
+    <>
+      <div className="ambient" aria-hidden />
+      <div className="flex min-h-screen items-center justify-center p-6">
+      <div className="glass w-full max-w-md p-8">
+        <h1 className="heading mb-2 text-xl">
           The admin panel could not load
         </h1>
-        <p className="text-sm text-[#A68F8C] mb-4">
-          If this is a fresh deployment, check that <code className="text-[#E87A8C]">SUPABASE_SERVICE_ROLE_KEY</code> is
-          set and that both migrations in <code className="text-[#E87A8C]">supabase/migrations/</code> have been run.
+        <p className="mb-4 text-sm text-[var(--text-muted)]">
+          If this is a fresh deployment, check that <code className="text-[var(--accent)]">SUPABASE_SERVICE_ROLE_KEY</code> is
+          set and that both migrations in <code className="text-[var(--accent)]">supabase/migrations/</code> have been run.
         </p>
-        <pre className="text-xs text-[#8C7A77] bg-black/30 p-3 rounded-lg overflow-x-auto mb-6 whitespace-pre-wrap">
+        <pre className="mb-6 overflow-x-auto whitespace-pre-wrap rounded-lg bg-black/30 p-3 text-xs text-[var(--text-faint)]">
           {error.message}
         </pre>
         <div className="flex gap-3">
@@ -31,6 +33,7 @@ export default function AdminError({ error, reset }: { error: Error; reset: () =
           </form>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   )
 }

@@ -40,7 +40,7 @@ export default function RegisterForm({
   }
 
   return (
-    <form onSubmit={submit} className="card flex flex-col gap-5 p-6">
+    <form onSubmit={submit} className="glass flex flex-col gap-5 p-6">
       <div>
         <h2 className="font-[family-name:var(--font-space-grotesk)] text-xl font-bold text-white">
           {solo ? 'Register for this event' : 'Register your team'}

@@ -25,7 +25,7 @@ export default function EventCard({
   const closesIn = timeUntil(deadline, now)
 
   return (
-    <Link href={`/events/${event.id}`} className="card card-hover flex flex-col overflow-hidden">
+    <Link href={`/events/${event.id}`} className="glass card-hover flex flex-col overflow-hidden">
       {event.banner_url && (
         // Admin-supplied URLs from arbitrary hosts, so plain <img> rather than
         // next/image — which would need every host allow-listed up front.

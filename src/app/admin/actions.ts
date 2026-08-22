@@ -181,7 +181,111 @@ export async function addTeamMember(teamId: string, eventId: string, username: s
 export async function removeTeamMember(memberId: string, eventId: string) {
   await requireAdmin()
   const supabase = createAdminClient()
+
+  // Removing the leader used to leave `event_teams.created_by` pointing at
+  // somebody with no membership row. That team then had nobody who could
+  // invite, and the leader could not even see it — get_event_team finds a team
+  // through the roster, not through created_by. Hand leadership on instead.
+  const { data: membership } = await supabase
+    .from('event_team_members')
+    .select('user_id, team_id, event_teams(created_by)')
+    .eq('id', memberId)
+    .maybeSingle()
+  if (!membership) throw new Error('That member is no longer on the team.')
+
+  const team = membership.event_teams as unknown as { created_by: string } | null
+  if (team && team.created_by === membership.user_id) {
+    const { data: heirs } = await supabase
+      .from('event_team_members')
+      .select('user_id')
+      .eq('team_id', membership.team_id)
+      .eq('status', 'accepted')
+      .neq('user_id', membership.user_id)
+      .order('responded_at', { ascending: true })
+      .limit(1)
+
+    const heir = heirs?.[0]
+    if (!heir) {
+      throw new Error(
+        'This is the only confirmed member, so there is nobody to hand the team to. Remove the whole team instead.',
+      )
+    }
+    const { error: transferError } = await supabase
+      .from('event_teams')
+      .update({ created_by: heir.user_id })
+      .eq('id', membership.team_id)
+    if (transferError) throw new Error(`Could not hand over the team: ${transferError.message}`)
+  }
+
   const { error } = await supabase.from('event_team_members').delete().eq('id', memberId)
   if (error) throw new Error(error.message)
   revalidatePath(`/admin/events/${eventId}/teams`)
+}
+
+/** Hands leadership to another confirmed member of the same team. */
+export async function makeTeamLeader(memberId: string, eventId: string) {
+  await requireAdmin()
+  const supabase = createAdminClient()
+
+  const { data: membership } = await supabase
+    .from('event_team_members')
+    .select('user_id, team_id, status')
+    .eq('id', memberId)
+    .maybeSingle()
+  if (!membership) throw new Error('That member is no longer on the team.')
+  if (membership.status !== 'accepted') {
+    throw new Error('Only a confirmed member can lead a team.')
+  }
+
+  const { error } = await supabase
+    .from('event_teams')
+    .update({ created_by: membership.user_id })
+    .eq('id', membership.team_id)
+  if (error) {
+    // event_teams is unique on (event_id, created_by) — one team per person.
+    throw new Error(
+      error.code === '23505'
+        ? 'That person already leads another team for this event.'
+        : error.message,
+    )
+  }
+  revalidatePath(`/admin/events/${eventId}/teams`)
+}
+
+/**
+ * Username lookup for the admin roster box. Deliberately not the members'
+ * `search_usernames` RPC: that one gates on auth.uid() and is granted to the
+ * `authenticated` role, and an admin session is not a Supabase Auth user at
+ * all. This goes through the service-role client instead.
+ */
+export async function searchProfiles(query: string, eventId: string) {
+  await requireAdmin()
+  const q = query.trim().replace(/^@/, '')
+  if (q.length < 2) return []
+
+  const supabase = createAdminClient()
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, username, full_name')
+    .ilike('username', `${q}%`)
+    .order('username')
+    .limit(8)
+  if (!profiles?.length) return []
+
+  // Flag anyone already placed, so an admin does not have to discover the
+  // "already on another team" error by hitting it.
+  const { data: teamIds } = await supabase.from('event_teams').select('id').eq('event_id', eventId)
+  const { data: taken } = await supabase
+    .from('event_team_members')
+    .select('user_id')
+    .eq('status', 'accepted')
+    .in('team_id', (teamIds ?? []).map((t) => t.id))
+    .in('user_id', profiles.map((p) => p.id))
+
+  const takenIds = new Set((taken ?? []).map((r) => r.user_id))
+  return profiles.map((p) => ({
+    username: p.username as string,
+    fullName: (p.full_name as string) ?? '',
+    onATeam: takenIds.has(p.id),
+  }))
 }

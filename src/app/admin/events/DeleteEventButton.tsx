@@ -7,7 +7,7 @@ export default function DeleteEventButton({ eventId, action }: { eventId: string
 
   return (
     <button
-      className="text-red-400 hover:text-red-300 disabled:opacity-50"
+      className="btn btn-danger !px-3 !py-2 !text-xs"
       disabled={pending}
       onClick={() => {
         if (!confirm('Delete this event? This also removes every team and invitation registered for it.')) return

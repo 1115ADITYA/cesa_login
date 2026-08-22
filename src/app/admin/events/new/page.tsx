@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { isAdmin } from '@/lib/adminAuth'
-import AdminNav from '../../AdminNav'
+import AdminShell, { AdminHeader } from '../../AdminShell'
 import EventForm from '../EventForm'
 import { createEvent } from '../../actions'
 
@@ -10,12 +10,9 @@ export default async function NewEventPage() {
   if (!(await isAdmin())) redirect('/admin')
 
   return (
-    <div className="min-h-screen bg-[#130F0E] text-[#F3E9E8] p-8">
-      <div className="max-w-5xl mx-auto">
-        <AdminNav active="events" />
-        <h1 className="text-2xl font-bold font-[family-name:var(--font-space-grotesk)] mb-6">New event</h1>
+    <AdminShell>
+      <AdminHeader title="New event" subtitle="Publishing makes it visible to every member immediately." back={{ href: '/admin/events', label: 'All events' }} />
         <EventForm action={createEvent} submitLabel="Create event" />
-      </div>
-    </div>
+    </AdminShell>
   )
 }

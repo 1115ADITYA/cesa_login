@@ -10,16 +10,27 @@
 :root {
   --font-space-grotesk: 'Space Grotesk', sans-serif;
 
+  /* Backdrop artwork. Swap between /bg-day.jpg (dawn) and /bg-ambient.jpg
+     (night) here — the scrim below is tuned for the dawn one; the night image
+     wants roughly 0.55/0.60/0.70 instead, since its brightness sits in small
+     near-white blossom highlights rather than spread across the frame. */
+  --page-art: url('/bg-day.jpg');
+  --scrim-top: 0.42;
+  --scrim-mid: 0.38;
+  --scrim-bottom: 0.5;
+
   --bg: #130f0e;
   --bg-elevated: #1d1716;
-  --bg-sunken: rgba(0, 0, 0, 0.28);
+  --bg-sunken: rgba(0, 0, 0, 0.22);
   --border: rgba(255, 255, 255, 0.06);
   --border-strong: rgba(255, 255, 255, 0.12);
 
   --text: #f3e9e8;
   --text-bright: #fdf8f8;
-  --text-muted: #a68f8c;
-  --text-faint: #8c7a77;
+  /* Lifted from #a68f8c / #8c7a77: the cards are translucent now, so
+     secondary text sits on lit artwork rather than a dark panel. */
+  --text-muted: #cbb9b6;
+  --text-faint: #b0a09d;
 
   --accent: #e87a8c;
   --accent-deep: #d16475;
@@ -58,9 +69,19 @@ body {
     transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
   }
   .card-hover:hover {
-    border-color: rgba(232, 122, 140, 0.35);
+    border-color: rgba(232, 122, 140, 0.4);
     transform: translateY(-2px);
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.16),
+      0 18px 38px rgba(0, 0, 0, 0.42),
+      0 0 0 1px rgba(232, 122, 140, 0.08);
+  }
+
+  /* A card sitting inside a band stacks two translucent layers, so it stays
+     lighter than a standalone one — the denser .shell underneath already
+     brings the combined density to ~0.81. */
+  .shell .glass {
+    background-color: rgba(29, 23, 22, 0.44);
   }
 
   .field {
@@ -176,4 +197,133 @@ body {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-faint);
+}
+
+/* ---------------------------------------------------------------------------
+   Ambient page background.
+
+   `bg-ambient.jpg` sits under two dark scrims so it reads as atmosphere rather
+   than wallpaper — text contrast never depends on which part of the artwork is
+   behind it. If the file is absent the gradients alone still carry the page,
+   so a missing asset degrades quietly instead of flashing white.
+   --------------------------------------------------------------------------- */
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--bg);
+  background-image:
+    /* Heavier than the night image needed, but the result is brighter on
+       screen AND safer for text: the dawn art carries its light in broad warm
+       mid-tones rather than tiny near-white specular highlights, so a given
+       amount of scrim buys far more contrast headroom. Slightly lighter in the
+       middle band, where the fog already is. */
+    linear-gradient(
+      180deg,
+      rgba(19, 15, 14, var(--scrim-top)) 0%,
+      rgba(19, 15, 14, var(--scrim-mid)) 45%,
+      rgba(19, 15, 14, var(--scrim-bottom)) 100%
+    ),
+    radial-gradient(60rem 34rem at 78% -8%, rgba(232, 122, 140, 0.12), transparent 62%),
+    radial-gradient(48rem 30rem at 4% 18%, rgba(122, 162, 232, 0.07), transparent 60%),
+    var(--page-art);
+  background-size: cover, auto, auto, cover;
+  background-position: center, center, center, center top;
+  background-repeat: no-repeat;
+}
+
+@layer components {
+  /* The bordered wrapper each band of the home page sits in. */
+  /* Surfaces carry the contrast now that the backdrop is bright. At 0.82 the
+     brightest blossom highlight still leaves headings at ~12.6:1 and muted
+     text at ~4.4:1 behind a card. */
+  .shell {
+    border: 1px solid var(--border-strong);
+    border-radius: 1.5rem;
+    background-color: rgba(29, 23, 22, 0.66);
+    /* Softer sheen than .glass — a band is a large surface, and the same
+       intensity across that area would read as a gradient rather than glass. */
+    background-image: linear-gradient(
+      170deg,
+      rgba(255, 255, 255, 0.05) 0%,
+      rgba(255, 255, 255, 0.01) 30%,
+      transparent 55%
+    );
+    backdrop-filter: blur(44px) saturate(160%);
+    text-shadow: 0 1px 3px rgba(19, 15, 14, 0.5);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      0 18px 44px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Real frosted glass: a saturated blur, a bright hairline along the top
+     edge where light would catch, and a sheen that dies out by 60% down. The
+     lift comes from the sheen rather than from raising the whole surface's
+     lightness, so the card body stays dark enough for text — worst-case
+     contrast behind the sheen is still ~12.8:1 for titles. */
+  .glass {
+    border: 1px solid var(--border-strong);
+    border-radius: 1.25rem;
+    background-color: rgba(29, 23, 22, 0.66);
+    background-image: linear-gradient(
+      165deg,
+      rgba(255, 255, 255, 0.07) 0%,
+      rgba(255, 255, 255, 0.018) 38%,
+      transparent 62%
+    );
+    /* 40px is the load-bearing number. A strong blur collapses the artwork
+       behind the card to its local average, so the bright specular spots that
+       would otherwise fight the text simply stop existing — which is what buys
+       the low opacity. Dropping the blur without raising the opacity is what
+       would make this unreadable. */
+    backdrop-filter: blur(40px) saturate(170%);
+    text-shadow: 0 1px 3px rgba(19, 15, 14, 0.55);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      0 16px 40px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Page titles and their subtitles sit directly on the artwork, with no
+     surface under them. Flat contrast maths cannot see a shadow, so this is
+     belt-and-braces: the shadow does the work over blossom highlights, and the
+     subtitle uses the bright text token rather than the muted one. */
+  .on-art {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 2px 16px rgba(19, 15, 14, 0.9);
+  }
+
+  /* Horizontal card rail — "Your events" on the home page. */
+  .rail {
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    /* `overflow-x: auto` forces overflow-y to `auto` as well, so the 2px hover
+       lift and the card's drop shadow were being clipped against the top of
+       this scroll box — which read as the card sliding under the heading.
+       The padding gives them room; the negative margin keeps the cards
+       visually flush with the rest of the band. */
+    padding: 0.5rem 0.35rem 0.75rem;
+    margin: -0.5rem -0.35rem -0.35rem;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  }
+  .rail > * {
+    scroll-snap-align: start;
+    flex: 0 0 min(23rem, 82vw);
+  }
+  .rail::-webkit-scrollbar {
+    height: 6px;
+  }
+  .rail::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+  }
+
+  .heading {
+    font-family: var(--font-space-grotesk);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text-bright);
+  }
 }

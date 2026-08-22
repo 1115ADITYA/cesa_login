@@ -79,10 +79,15 @@ export function formatDateRange(startsAt: string, endsAt: string) {
   const endTime = end.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 
   if (sameDay) return `${date} · ${startTime} – ${endTime}`
-  return `${date} ${startTime} → ${end.toLocaleDateString(undefined, {
+
+  // Carry the year on the end date only when it differs, otherwise a range
+  // like 1 Mar 2026 → 1 Jan reads as if the event runs backwards.
+  const endDate = end.toLocaleDateString(undefined, {
     day: 'numeric',
     month: 'short',
-  })} ${endTime}`
+    ...(end.getFullYear() === start.getFullYear() ? {} : { year: 'numeric' }),
+  })
+  return `${date} ${startTime} → ${endDate} ${endTime}`
 }
 
 /** "in 3 days" / "in 4 hours" / "closed" — for the registration deadline. */

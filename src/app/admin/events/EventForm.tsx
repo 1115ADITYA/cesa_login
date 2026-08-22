@@ -34,9 +34,9 @@ export default function EventForm({
   const [state, formAction, pending] = useActionState(action, null)
 
   return (
-    <form action={formAction} className="flex flex-col gap-4 max-w-xl">
+    <form action={formAction} className="glass flex max-w-xl flex-col gap-4 p-6">
       {state?.error && (
-        <div className="text-sm text-red-400 bg-red-400/10 p-3 rounded-xl border border-red-400/20">{state.error}</div>
+        <div className="alert alert-error">{state.error}</div>
       )}
 
       <Field label="Title">
@@ -79,8 +79,8 @@ export default function EventForm({
           <input type="number" min={1} name="maxTeamSize" defaultValue={defaults?.maxTeamSize ?? ''} className={inputClass} />
         </Field>
       </div>
-      <p className="-mt-2 text-xs text-[#8C7A77]">
-        A team is only <strong className="text-[#D1C2C0]">confirmed</strong> once the minimum number of members have
+      <p className="-mt-2 text-xs text-[var(--text-faint)]">
+        A team is only <strong className="text-[var(--text)]">confirmed</strong> once the minimum number of members have
         accepted their invitations. Set both to 1 for a solo event — participants then register without naming a team.
       </p>
 
@@ -95,7 +95,7 @@ export default function EventForm({
       <button
         type="submit"
         disabled={pending}
-        className="mt-2 bg-gradient-to-r from-[#D16475] to-[#E87A8C] text-white font-bold py-3 rounded-xl disabled:opacity-50"
+        className="btn btn-primary mt-2 !py-3"
       >
         {pending ? 'Saving…' : submitLabel}
       </button>
@@ -103,13 +103,12 @@ export default function EventForm({
   )
 }
 
-const inputClass =
-  'w-full p-3 rounded-xl border border-white/5 bg-black/30 text-[#F3E9E8] text-sm outline-none transition-all focus:border-[#E87A8C] focus:bg-black/50'
+const inputClass = 'field'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-bold text-[#8C7A77] uppercase tracking-wider">{label}</label>
+      <label className="label">{label}</label>
       {children}
     </div>
   )
