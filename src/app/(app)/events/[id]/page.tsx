@@ -1,7 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/utils/supabase/server'
-import AppShell from '@/components/AppShell'
+import { getClient, getUser } from '@/utils/supabase/server'
 import RegisterForm from './RegisterForm'
 import TeamPanel from './TeamPanel'
 import {
@@ -18,15 +17,14 @@ export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const supabase = await createClient()
+  const supabase = await getClient()
   const { data } = await supabase.from('events').select('title').eq('id', id).maybeSingle()
   return { title: data ? `${data.title} — CESA` : 'Event — CESA' }
 }
 
 export default async function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const [supabase, user] = await Promise.all([getClient(), getUser()])
   if (!user) redirect('/')
 
   const [{ data: eventRow }, { data: teamJson }] = await Promise.all([
@@ -48,7 +46,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   const registrationOpen = deadline.getTime() > now
 
   return (
-    <AppShell>
+    <>
       <div className="mx-auto max-w-3xl">
         <Link href="/events" className="text-sm text-[var(--text-muted)] transition-colors hover:text-white">
           ← All events
@@ -131,7 +129,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
           )}
         </div>
       </div>
-    </AppShell>
+    </>
   )
 }
 

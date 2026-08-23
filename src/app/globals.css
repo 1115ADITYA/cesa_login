@@ -14,7 +14,10 @@
      (night) here — the scrim below is tuned for the dawn one; the night image
      wants roughly 0.55/0.60/0.70 instead, since its brightness sits in small
      near-white blossom highlights rather than spread across the frame. */
-  --page-art: url('/bg-day.jpg');
+  /* WebP with a JPEG fallback: 434KB -> 84KB, and it is fetched on every page.
+     image-set picks the first format the browser supports, so older engines
+     still get the jpg. Swap the pair to /bg-ambient.* for the night art. */
+  --page-art: image-set(url('/bg-day.webp') type('image/webp'), url('/bg-day.jpg') type('image/jpeg'));
   --scrim-top: 0.42;
   --scrim-mid: 0.38;
   --scrim-bottom: 0.5;

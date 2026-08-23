@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/utils/supabase/server'
+import { createClient, getUser } from '@/utils/supabase/server'
 
 /**
  * Every write goes through a Postgres RPC (supabase/migrations/0002_team_flow.sql)
@@ -22,8 +22,7 @@ function fail(message: string): Result {
 }
 
 export async function registerForEvent(eventId: string, teamName: string): Promise<Result> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const [supabase, user] = await Promise.all([createClient(), getUser()])
   if (!user) return { error: 'Please sign in again.' }
 
   const { error } = await supabase.rpc('register_for_event', {

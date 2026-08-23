@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import AppShell, { Band, EmptyState } from '@/components/AppShell'
-import EventCard from '@/app/events/EventCard'
+import { Band, EmptyState } from '@/components/AppShell'
+import EventCard from '@/app/(app)/events/EventCard'
 import EventRow from '@/components/EventRow'
 import { loadEventBoard } from '@/lib/eventData'
 
@@ -18,7 +18,7 @@ export default async function Home() {
   const browse = all.filter((e) => !byEvent.has(e.id)).slice(0, 6)
 
   return (
-    <AppShell>
+    <>
       <div className="flex flex-col gap-6">
         <Band
           title="Your events"
@@ -84,6 +84,6 @@ export default async function Home() {
           )}
         </Band>
       </div>
-    </AppShell>
+    </>
   )
 }

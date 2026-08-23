@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { isAdmin } from '@/lib/adminAuth'
 import { createAdminClient } from '@/utils/supabase/admin'
-import AdminShell, { AdminHeader } from '../../../AdminShell'
+import { AdminHeader } from '../../../AdminShell'
 import TeamRow from './TeamRow'
 import { renameTeam, removeTeam, addTeamMember, removeTeamMember, makeTeamLeader, searchProfiles } from '../../../actions'
 
@@ -52,7 +52,7 @@ export default async function EventTeamsPage({ params }: { params: Promise<{ id:
   )
 
   return (
-    <AdminShell>
+    <>
       <AdminHeader
         title={event.title}
         subtitle={`Needs ${event.min_team_size} accepted member${event.min_team_size === 1 ? '' : 's'} for a team to count as confirmed.`}
@@ -105,7 +105,7 @@ export default async function EventTeamsPage({ params }: { params: Promise<{ id:
           ))}
         </div>
       )}
-    </AdminShell>
+    </>
   )
 }
 

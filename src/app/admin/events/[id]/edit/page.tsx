@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { isAdmin } from '@/lib/adminAuth'
 import { createAdminClient } from '@/utils/supabase/admin'
-import AdminShell, { AdminHeader } from '../../../AdminShell'
+import { AdminHeader } from '../../../AdminShell'
 import EventForm from '../../EventForm'
 import { updateEvent } from '../../../actions'
 
@@ -18,7 +18,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
   const boundUpdate = updateEvent.bind(null, id)
 
   return (
-    <AdminShell>
+    <>
       <AdminHeader title="Edit event" subtitle="Changes apply to the members’ board straight away." back={{ href: '/admin/events', label: 'All events' }} />
         <EventForm
           action={boundUpdate}
@@ -35,6 +35,6 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
             maxTeamSize: event.max_team_size,
           }}
         />
-    </AdminShell>
+    </>
   )
 }

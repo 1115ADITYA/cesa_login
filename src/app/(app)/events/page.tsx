@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import AppShell, { Band, EmptyState } from '@/components/AppShell'
+import { Band, EmptyState } from '@/components/AppShell'
 import EventRow from '@/components/EventRow'
 import EventCard from './EventCard'
 import { loadEventBoard } from '@/lib/eventData'
@@ -11,7 +11,7 @@ export default async function EventsPage() {
   const { now, all, live, open, closed, past, byEvent } = await loadEventBoard()
 
   return (
-    <AppShell>
+    <>
       <div className="mb-7">
         <h1 className="heading on-art text-3xl sm:text-4xl">Events</h1>
         <p className="on-art mt-2 text-[var(--text)]">
@@ -76,6 +76,6 @@ export default async function EventsPage() {
           )}
         </div>
       )}
-    </AppShell>
+    </>
   )
 }
