@@ -1,6 +1,6 @@
 import 'server-only'
 import { redirect } from 'next/navigation'
-import { createClient } from '@/utils/supabase/server'
+import { getClient, getUser } from '@/utils/supabase/server'
 import { eventPhase, registrationDeadline, type EventRow, type MyRegistration } from './events'
 
 /**
@@ -9,8 +9,7 @@ import { eventPhase, registrationDeadline, type EventRow, type MyRegistration } 
  * their own version of this and disagreeing about what "registered" meant.
  */
 export async function loadEventBoard() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const [supabase, user] = await Promise.all([getClient(), getUser()])
   if (!user) redirect('/')
 
   const [{ data: events }, { data: regs }] = await Promise.all([

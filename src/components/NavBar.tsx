@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { respondToInvite } from '@/app/events/actions'
+import { respondToInvite } from '@/app/(app)/events/actions'
 
 export type NavInvite = {
   membershipId: string

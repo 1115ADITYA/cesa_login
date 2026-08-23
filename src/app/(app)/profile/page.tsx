@@ -1,15 +1,13 @@
 import { redirect } from 'next/navigation'
-import AppShell from '@/components/AppShell'
-import { createClient } from '@/utils/supabase/server'
-import { ProfileCard } from '@/app/dashboard/profile-card'
+import { getClient, getUser } from '@/utils/supabase/server'
+import { ProfileCard } from '@/app/(app)/dashboard/profile-card'
 import { loadEventBoard } from '@/lib/eventData'
 
 export const metadata = { title: 'Profile — CESA' }
 export const dynamic = 'force-dynamic'
 
 export default async function ProfilePage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const [supabase, user] = await Promise.all([getClient(), getUser()])
   if (!user) redirect('/')
 
   const [{ data: profile }, board] = await Promise.all([
@@ -22,7 +20,7 @@ export default async function ProfilePage() {
   const leading = joined.filter((r) => r.is_leader).length
 
   return (
-    <AppShell>
+    <>
       <div className="mb-7">
         <h1 className="heading on-art text-3xl sm:text-4xl">Profile</h1>
         <p className="on-art mt-2 text-[var(--text)]">
@@ -61,7 +59,7 @@ export default async function ProfilePage() {
           </section>
         </div>
       </div>
-    </AppShell>
+    </>
   )
 }
 

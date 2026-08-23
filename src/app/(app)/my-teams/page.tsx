@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import AppShell, { EmptyState } from '@/components/AppShell'
+import { EmptyState } from '@/components/AppShell'
 import TeamProgress from '@/components/TeamProgress'
 import { loadEventBoard } from '@/lib/eventData'
 import { teamSizeLabel } from '@/lib/events'
@@ -15,7 +15,7 @@ export default async function MyTeamsPage() {
   const confirmed = teams.filter((r) => r.confirmed).length
 
   return (
-    <AppShell>
+    <>
       <div className="mb-7">
         <h1 className="heading on-art text-3xl sm:text-4xl">Your teams</h1>
         <p className="on-art mt-2 text-[var(--text)]">
@@ -78,6 +78,6 @@ export default async function MyTeamsPage() {
           })}
         </div>
       )}
-    </AppShell>
+    </>
   )
 }

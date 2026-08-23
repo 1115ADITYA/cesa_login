@@ -1,20 +1,8 @@
-import SiteNav from './SiteNav'
-
 /**
- * Every signed-in page is the same three layers: the fixed ambient backdrop,
- * the sticky nav, then a centred column. Keeping it here means a new page
- * cannot accidentally ship without the nav — which is how `/events` and
- * `/dashboard` ended up cross-linking to each other by hand.
+ * Layout primitives shared by the signed-in pages. The shell itself (backdrop,
+ * nav, container) is `app/(app)/layout.tsx` now — keeping it out of the page
+ * tree is what lets Next preserve the nav across navigations.
  */
-export default function AppShell({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <div className="ambient" aria-hidden />
-      <SiteNav />
-      <main className="mx-auto max-w-6xl px-5 pb-20 pt-8 sm:px-8">{children}</main>
-    </>
-  )
-}
 
 /** The bordered band the home page stacks — header row plus content. */
 export function Band({

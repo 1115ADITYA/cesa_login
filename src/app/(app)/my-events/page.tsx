@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import AppShell, { Band, EmptyState } from '@/components/AppShell'
-import EventCard from '@/app/events/EventCard'
+import { Band, EmptyState } from '@/components/AppShell'
+import EventCard from '@/app/(app)/events/EventCard'
 import { loadEventBoard } from '@/lib/eventData'
 import { eventPhase } from '@/lib/events'
 
@@ -16,7 +16,7 @@ export default async function MyEventsPage() {
   const finished = joined.filter((e) => eventPhase(e, now) === 'past')
 
   return (
-    <AppShell>
+    <>
       <div className="mb-7">
         <h1 className="heading on-art text-3xl sm:text-4xl">Your events</h1>
         <p className="on-art mt-2 text-[var(--text)]">
@@ -66,6 +66,6 @@ export default async function MyEventsPage() {
           )}
         </div>
       )}
-    </AppShell>
+    </>
   )
 }

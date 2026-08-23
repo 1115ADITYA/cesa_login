@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { isAdmin } from '@/lib/adminAuth'
 import { createAdminClient } from '@/utils/supabase/admin'
-import AdminShell, { AdminHeader } from '../AdminShell'
+import { AdminHeader } from '../AdminShell'
 import { deleteEvent } from '../actions'
 import DeleteEventButton from './DeleteEventButton'
 import { formatDateRange, teamSizeLabel, type EventRow } from '@/lib/events'
@@ -39,7 +39,7 @@ export default async function AdminEventsPage() {
   const now = Date.now()
 
   return (
-    <AdminShell>
+    <>
       <AdminHeader
         title="Events"
         subtitle={all.length === 0 ? 'Nothing published yet.' : `${all.length} event${all.length === 1 ? '' : 's'}`}
@@ -109,7 +109,7 @@ export default async function AdminEventsPage() {
           })}
         </div>
       )}
-    </AdminShell>
+    </>
   )
 }
 

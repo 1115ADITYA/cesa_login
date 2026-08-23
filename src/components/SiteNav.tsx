@@ -1,4 +1,4 @@
-import { createClient } from '@/utils/supabase/server'
+import { getClient, getUser } from '@/utils/supabase/server'
 import NavBar, { type NavInvite, type NavProfile } from './NavBar'
 
 type InvitationRow = {
@@ -18,8 +18,7 @@ type InvitationRow = {
  * there is no `active` prop any more.
  */
 export default async function SiteNav() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const [supabase, user] = await Promise.all([getClient(), getUser()])
   if (!user) return null
 
   const [{ data: profileRow }, { data: invitationRows }] = await Promise.all([
