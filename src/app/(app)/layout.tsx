@@ -1,4 +1,6 @@
+import { Suspense } from 'react'
 import SiteNav from '@/components/SiteNav'
+import { NavSkeleton } from '@/components/Skeletons'
 
 /**
  * The signed-in shell, as a layout rather than a per-page wrapper.
@@ -7,17 +9,19 @@ import SiteNav from '@/components/SiteNav'
  * which meant its profile lookup and invitation RPC ran again each time. In a
  * layout, Next only re-renders the segments that actually changed, so moving
  * between Home / Events / Your Teams re-renders the page and leaves the nav
- * mounted: two fewer Supabase round trips per click, and the header no longer
- * flickers.
+ * mounted.
  *
- * It also gives `loading.tsx` something worth showing — the nav stays put and
- * only the content area falls back to a skeleton.
+ * The Suspense boundary matters as much: this layout is synchronous, so the
+ * server flushes the page frame straight away and streams the nav's data in
+ * behind it. Awaiting the nav here would have held up the whole document.
  */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
       <div className="ambient" aria-hidden />
-      <SiteNav />
+      <Suspense fallback={<NavSkeleton />}>
+        <SiteNav />
+      </Suspense>
       <main className="mx-auto max-w-6xl px-5 pb-20 pt-8 sm:px-8">{children}</main>
     </>
   )
