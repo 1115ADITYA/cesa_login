@@ -1,5 +1,16 @@
 import { getClient, getUser } from '@/utils/supabase/server'
-import NavBar, { type NavInvite, type NavProfile } from './NavBar'
+import LiveRefresh from './LiveRefresh'
+import NavBar, { type NavInvite, type NavNotification, type NavProfile } from './NavBar'
+
+type NotificationRow = {
+  id: string
+  kind: NavNotification['kind']
+  title: string
+  body: string
+  event_id: string | null
+  read_at: string | null
+  created_at: string
+}
 
 type InvitationRow = {
   membership_id: string
@@ -21,12 +32,20 @@ export default async function SiteNav() {
   const [supabase, user] = await Promise.all([getClient(), getUser()])
   if (!user) return null
 
-  const [{ data: profileRow }, { data: invitationRows }] = await Promise.all([
+  const [{ data: profileRow }, { data: invitationRows }, { data: notificationRows }] = await Promise.all([
     supabase.from('profiles').select('username, full_name, avatar_url, role').eq('id', user.id).maybeSingle(),
     supabase.rpc('get_my_invitations'),
+    // RLS scopes this to the caller (notifications_read_own), so no filter is
+    // needed here beyond the ordering and cap.
+    supabase
+      .from('notifications')
+      .select('id, kind, title, body, event_id, read_at, created_at')
+      .order('created_at', { ascending: false })
+      .limit(20),
   ])
 
   const profile: NavProfile = {
+    id: user.id,
     username: profileRow?.username ?? '',
     fullName: profileRow?.full_name ?? null,
     avatarUrl: profileRow?.avatar_url || null,
@@ -42,5 +61,22 @@ export default async function SiteNav() {
     invitedByUsername: r.invited_by_username ?? 'someone',
   }))
 
-  return <NavBar profile={profile} invites={invites} />
+  const notifications: NavNotification[] = ((notificationRows ?? []) as NotificationRow[]).map((n) => ({
+    id: n.id,
+    kind: n.kind,
+    title: n.title,
+    body: n.body,
+    eventId: n.event_id,
+    read: n.read_at !== null,
+    createdAt: n.created_at,
+  }))
+
+  return (
+    <>
+      {/* Lives here rather than in the layout because it needs the user id for
+          its realtime filter, and this is the first place that has one. */}
+      <LiveRefresh userId={user.id} />
+      <NavBar profile={profile} invites={invites} notifications={notifications} />
+    </>
+  )
 }
