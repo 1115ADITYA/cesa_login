@@ -23,8 +23,7 @@ export const EVENTS_TAG = 'events'
  */
 const loadEvents = unstable_cache(
   async () => {
-    const { createAdminClient } = await import('@/utils/supabase/admin')
-    const supabase = createAdminClient()
+    const supabase = createAnonClient()
     const { data, error } = await supabase.from('events').select('*').order('starts_at', { ascending: true })
     // Never cache a failure as an empty catalogue: that would pin "no events"
     // in place until the next admin write.
