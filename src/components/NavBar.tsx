@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { respondToInvite } from '@/app/(app)/events/actions'
+import { markNotificationsRead, respondToInvite } from '@/app/(app)/events/actions'
 
 export type NavInvite = {
   membershipId: string
@@ -14,7 +14,21 @@ export type NavInvite = {
   invitedByUsername: string
 }
 
+export type NavNotification = {
+  id: string
+  kind:
+    | 'invite_received' | 'invite_accepted' | 'invite_declined'
+    | 'removed_from_team' | 'team_disbanded' | 'team_confirmed'
+    | 'event_updated' | 'event_cancelled'
+  title: string
+  body: string
+  eventId: string | null
+  read: boolean
+  createdAt: string
+}
+
 export type NavProfile = {
+  id: string
   username: string
   fullName: string | null
   avatarUrl: string | null
@@ -29,7 +43,15 @@ const LINKS = [
   { href: '/my-teams', label: 'Your Teams' },
 ]
 
-export default function NavBar({ profile, invites }: { profile: NavProfile | null; invites: NavInvite[] }) {
+export default function NavBar({
+  profile,
+  invites,
+  notifications,
+}: {
+  profile: NavProfile | null
+  invites: NavInvite[]
+  notifications: NavNotification[]
+}) {
   const pathname = usePathname()
   // Only one panel open at a time — two stacked dropdowns overlapping in the
   // top-right corner is the fastest way to make a header feel broken.
@@ -66,6 +88,7 @@ export default function NavBar({ profile, invites }: { profile: NavProfile | nul
         <div className="ml-auto flex items-center gap-2.5">
           <NotificationBell
             invites={invites}
+            notifications={notifications}
             open={open === 'bell'}
             onToggle={() => setOpen((v) => (v === 'bell' ? 'none' : 'bell'))}
             onClose={() => setOpen('none')}
@@ -110,11 +133,13 @@ export default function NavBar({ profile, invites }: { profile: NavProfile | nul
 
 function NotificationBell({
   invites,
+  notifications,
   open,
   onToggle,
   onClose,
 }: {
   invites: NavInvite[]
+  notifications: NavNotification[]
   open: boolean
   onToggle: () => void
   onClose: () => void
@@ -122,6 +147,23 @@ function NotificationBell({
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  // `invite_received` rows exist to drive the realtime subscription — an insert
+  // on `notifications` is what wakes the client. But the invitation itself is
+  // already shown, actionable, in the block above, so counting the row as well
+  // reported one invite as two unread.
+  const activity = notifications.filter((n) => n.kind !== 'invite_received')
+  const unreadCount = invites.length + activity.filter((n) => !n.read).length
+
+  // Opening the panel is the read receipt. Fire-and-forget: a failed mark-read
+  // only means the dot lingers, which is not worth blocking the UI over.
+  const markRead = () => {
+    const unread = notifications.filter((n) => !n.read).map((n) => n.id)  // includes invite_received, so the dot clears everywhere
+    if (unread.length === 0) return
+    startTransition(async () => {
+      await markNotificationsRead(unread)
+      router.refresh()
+    })
+  }
 
   const respond = (membershipId: string, accept: boolean) => {
     setError(null)
@@ -138,8 +180,8 @@ function NotificationBell({
   return (
     <div className="relative">
       <button
-        onClick={onToggle}
-        aria-label={`Notifications${invites.length ? ` (${invites.length} unread)` : ''}`}
+        onClick={() => { if (!open) markRead(); onToggle() }}
+        aria-label={`Notifications${unreadCount ? ` (${unreadCount} unread)` : ''}`}
         aria-expanded={open}
         className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-[#D1C2C0] transition-colors hover:bg-white/10 hover:text-white"
       >
@@ -147,9 +189,9 @@ function NotificationBell({
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
-        {invites.length > 0 && (
+        {unreadCount > 0 && (
           <span className="absolute -right-1 -top-1 flex h-[1.15rem] min-w-[1.15rem] items-center justify-center rounded-full bg-gradient-to-br from-[#D16475] to-[#F4A5AE] px-1 text-[0.65rem] font-bold text-white ring-2 ring-[#130F0E]">
-            {invites.length}
+            {unreadCount}
           </span>
         )}
       </button>
@@ -160,16 +202,14 @@ function NotificationBell({
           <div className="absolute right-0 z-50 mt-2 w-[21rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-white/12 bg-[#1D1716]/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_24px_50px_rgba(0,0,0,0.6)] backdrop-blur-xl">
             <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
               <span className="text-sm font-bold text-white">Notifications</span>
-              {invites.length > 0 && (
-                <span className="text-[0.7rem] font-bold text-[#E87A8C]">{invites.length} pending</span>
+              {unreadCount > 0 && (
+                <span className="text-[0.7rem] font-bold text-[#E87A8C]">{unreadCount} new</span>
               )}
             </div>
 
             {error && <p className="px-4 py-2 text-xs text-red-400">{error}</p>}
 
-            {invites.length === 0 ? (
-              <p className="px-4 py-6 text-center text-sm text-[#8C7A77]">Nothing new right now.</p>
-            ) : (
+            {invites.length > 0 && (
               <ul className="max-h-[22rem] divide-y divide-white/[0.06] overflow-y-auto">
                 {invites.map((inv) => (
                   <li key={inv.membershipId} className="px-4 py-3">
@@ -200,11 +240,56 @@ function NotificationBell({
                 ))}
               </ul>
             )}
+
+            {activity.length > 0 && (
+              <>
+                {invites.length > 0 && (
+                  <p className="border-t border-white/[0.06] px-4 pt-3 text-[0.65rem] font-bold uppercase tracking-widest text-[#8C7A77]">
+                    Earlier
+                  </p>
+                )}
+                <ul className="max-h-[18rem] divide-y divide-white/[0.06] overflow-y-auto">
+                  {activity.map((n) => (
+                    <li key={n.id} className={`flex gap-2.5 px-4 py-3 ${n.read ? '' : 'bg-white/[0.03]'}`}>
+                      <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${n.read ? 'bg-transparent' : 'bg-[#E87A8C]'}`} />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-white">{n.title}</p>
+                        <p className="mt-0.5 text-xs leading-snug text-[#A68F8C]">
+                          {n.eventId ? (
+                            <Link href={`/events/${n.eventId}`} onClick={onClose} className="hover:text-white hover:underline">
+                              {n.body}
+                            </Link>
+                          ) : (
+                            n.body
+                          )}
+                        </p>
+                        <p className="mt-1 text-[0.65rem] text-[#6B5A58]">{relativeTime(n.createdAt)}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+
+            {invites.length === 0 && activity.length === 0 && (
+              <p className="px-4 py-6 text-center text-sm text-[#8C7A77]">Nothing new right now.</p>
+            )}
           </div>
         </>
       )}
     </div>
   )
+}
+
+/** "just now" / "12m ago" / "3d ago" — enough to place a notification in time. */
+function relativeTime(iso: string) {
+  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  if (seconds < 60) return 'just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
 }
 
 function ProfileMenu({
