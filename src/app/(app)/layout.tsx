@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import SiteNav from '@/components/SiteNav'
+import LiveRefresh from '@/components/LiveRefresh'
 import { NavSkeleton } from '@/components/Skeletons'
 
 /**
@@ -19,6 +20,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
       <div className="ambient" aria-hidden />
+      <LiveRefresh />
       <Suspense fallback={<NavSkeleton />}>
         <SiteNav />
       </Suspense>
