@@ -95,3 +95,21 @@ function revalidate(eventId?: string) {
   revalidatePath('/events')
   if (eventId) revalidatePath(`/events/${eventId}`)
 }
+
+/**
+ * Marks notifications read. Scoped by RLS (notifications_update_own), so the
+ * id list cannot be used to touch anyone else's rows even if it were forged.
+ */
+export async function markNotificationsRead(ids: string[]) {
+  if (ids.length === 0) return { success: true } as const
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read_at: new Date().toISOString() })
+    .in('id', ids)
+    .is('read_at', null)
+  if (error) return fail(error.message)
+
+  revalidatePath('/dashboard')
+  return { success: true } as const
+}

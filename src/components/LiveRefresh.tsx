@@ -2,27 +2,37 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/utils/supabase/client'
 
 /**
  * Keeps the layout's data fresh without giving up the layout.
  *
  * Moving the nav into app/(app)/layout.tsx is what stopped its profile lookup
- * and invitation RPC re-running on every click — but Next only re-renders the
- * segments that changed, so the layout never re-rendered at all. An invitation
- * that arrived while you were browsing stayed invisible until a full page
- * reload, because clicking between pages only ever re-rendered the page.
+ * and notification query re-running on every click — but Next only re-renders
+ * the segments that changed, and a layout is never one of them. So the nav's
+ * data was fetched once per full page load and then frozen: an invitation
+ * arriving while you browsed stayed invisible until a manual reload.
  *
  * `router.refresh()` re-fetches the current route from the server *including*
- * its layouts, which is exactly the missing piece. It is triggered on the two
- * moments that actually matter — coming back to the tab, and a slow tick while
- * you are looking at it — rather than on navigation, so the fast-navigation
- * win stays intact.
+ * its layouts, which is the missing piece. Three things trigger it:
  *
- * Refreshing is skipped while the tab is hidden: a background tab polling
- * Supabase every interval is pure waste, and the visibility listener catches
- * up the moment it is foregrounded.
+ *   1. A Postgres realtime subscription on `notifications` for this user. This
+ *      is the one that makes an invite appear immediately — the row lands and
+ *      the nav re-renders, no polling involved.
+ *   2. Returning to the tab, which covers anything missed while the socket was
+ *      closed or the laptop was asleep.
+ *   3. A slow tick, purely as a backstop for a dropped socket.
+ *
+ * Deliberately not on navigation, so the fast-click win survives. Hidden tabs
+ * skip the tick; the visibility listener catches up on return.
  */
-export default function LiveRefresh({ intervalMs = 60_000 }: { intervalMs?: number }) {
+export default function LiveRefresh({
+  userId,
+  intervalMs = 120_000,
+}: {
+  userId: string
+  intervalMs?: number
+}) {
   const router = useRouter()
 
   useEffect(() => {
@@ -34,12 +44,25 @@ export default function LiveRefresh({ intervalMs = 60_000 }: { intervalMs?: numb
     document.addEventListener('visibilitychange', refreshIfVisible)
     const timer = setInterval(refreshIfVisible, intervalMs)
 
+    // Filtered server-side by user_id: without the filter every client would
+    // wake on every notification in the table.
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`notifications:${userId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+        () => router.refresh(),
+      )
+      .subscribe()
+
     return () => {
       window.removeEventListener('focus', refreshIfVisible)
       document.removeEventListener('visibilitychange', refreshIfVisible)
       clearInterval(timer)
+      supabase.removeChannel(channel)
     }
-  }, [router, intervalMs])
+  }, [router, intervalMs, userId])
 
   return null
 }
