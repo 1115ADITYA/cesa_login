@@ -1,10 +1,15 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { isAdmin } from '@/lib/adminAuth'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { EVENTS_TAG } from '@/lib/eventData'
 
+// `updateTag` rather than `revalidateTag`: in Next 16 revalidateTag schedules
+// an expiry against a cache profile, while updateTag expires immediately and
+// gives read-your-own-writes inside a Server Action — which is what an admin
+// needs after creating an event and landing back on the list.
 async function requireAdmin() {
   if (!(await isAdmin())) throw new Error('Not authorised')
 }
@@ -79,6 +84,7 @@ export async function createEvent(prevState: unknown, formData: FormData) {
   const { error } = await supabase.from('events').insert(parsed.fields)
   if (error) return { error: error.message }
 
+  updateTag(EVENTS_TAG)
   revalidatePath('/admin/events')
   revalidatePath('/events')
   redirect('/admin/events')
@@ -96,6 +102,7 @@ export async function updateEvent(eventId: string, prevState: unknown, formData:
     .eq('id', eventId)
   if (error) return { error: error.message }
 
+  updateTag(EVENTS_TAG)
   revalidatePath('/admin/events')
   revalidatePath(`/admin/events/${eventId}`)
   revalidatePath('/events')
@@ -108,6 +115,7 @@ export async function deleteEvent(eventId: string) {
   // Teams and memberships cascade via the FK ON DELETE CASCADE in the migration.
   const { error } = await supabase.from('events').delete().eq('id', eventId)
   if (error) throw new Error(error.message)
+  updateTag(EVENTS_TAG)
   revalidatePath('/admin/events')
   revalidatePath('/events')
 }

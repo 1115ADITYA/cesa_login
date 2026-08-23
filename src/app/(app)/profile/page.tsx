@@ -1,12 +1,31 @@
+import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { getClient, getUser } from '@/utils/supabase/server'
 import { ProfileCard } from '@/app/(app)/dashboard/profile-card'
+import { CardGridSkeleton } from '@/components/Skeletons'
 import { loadEventBoard } from '@/lib/eventData'
 
 export const metadata = { title: 'Profile — CESA' }
 export const dynamic = 'force-dynamic'
 
-export default async function ProfilePage() {
+export default function ProfilePage() {
+  return (
+    <>
+      <div className="mb-7">
+        <h1 className="heading on-art text-3xl sm:text-4xl">Profile</h1>
+        <p className="on-art mt-2 text-[var(--text)]">
+          Your username is how teammates find and invite you, so keep it something they will recognise.
+        </p>
+      </div>
+
+      <Suspense fallback={<CardGridSkeleton cards={3} />}>
+        <ProfileContent />
+      </Suspense>
+    </>
+  )
+}
+
+async function ProfileContent() {
   const [supabase, user] = await Promise.all([getClient(), getUser()])
   if (!user) redirect('/')
 
@@ -20,15 +39,7 @@ export default async function ProfilePage() {
   const leading = joined.filter((r) => r.is_leader).length
 
   return (
-    <>
-      <div className="mb-7">
-        <h1 className="heading on-art text-3xl sm:text-4xl">Profile</h1>
-        <p className="on-art mt-2 text-[var(--text)]">
-          Your username is how teammates find and invite you, so keep it something they will recognise.
-        </p>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-3">
+    <div className="grid gap-6 md:grid-cols-3">
         <ProfileCard profile={profile} userEmail={user.email || ''} />
 
         <div className="flex flex-col gap-6 md:col-span-2">
@@ -58,8 +69,7 @@ export default async function ProfilePage() {
             </dl>
           </section>
         </div>
-      </div>
-    </>
+    </div>
   )
 }
 

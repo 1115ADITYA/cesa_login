@@ -1,15 +1,15 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { Band, EmptyState } from '@/components/AppShell'
 import EventRow from '@/components/EventRow'
 import EventCard from './EventCard'
+import { BandsSkeleton } from '@/components/Skeletons'
 import { loadEventBoard } from '@/lib/eventData'
 
 export const metadata = { title: 'Events — CESA' }
 export const dynamic = 'force-dynamic'
 
-export default async function EventsPage() {
-  const { now, all, live, open, closed, past, byEvent } = await loadEventBoard()
-
+export default function EventsPage() {
   return (
     <>
       <div className="mb-7">
@@ -19,6 +19,18 @@ export default async function EventsPage() {
         </p>
       </div>
 
+      <Suspense fallback={<BandsSkeleton bands={2} />}>
+        <EventsContent />
+      </Suspense>
+    </>
+  )
+}
+
+async function EventsContent() {
+  const { now, all, live, open, closed, past, byEvent } = await loadEventBoard()
+
+  return (
+    <>
       {all.length === 0 ? (
         <EmptyState
           title="No events published yet"

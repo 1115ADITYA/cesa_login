@@ -1,13 +1,23 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { Band, EmptyState } from '@/components/AppShell'
 import EventCard from '@/app/(app)/events/EventCard'
 import EventRow from '@/components/EventRow'
+import { BandsSkeleton } from '@/components/Skeletons'
 import { loadEventBoard } from '@/lib/eventData'
 
 export const metadata = { title: 'Home — CESA' }
 export const dynamic = 'force-dynamic'
 
-export default async function Home() {
+export default function Home() {
+  return (
+    <Suspense fallback={<BandsSkeleton bands={2} />}>
+      <HomeContent />
+    </Suspense>
+  )
+}
+
+async function HomeContent() {
   const { now, all, mine, byEvent, registrations } = await loadEventBoard()
 
   const needsAttention = registrations.filter((r) => r.my_status === 'accepted' && !r.confirmed).length
