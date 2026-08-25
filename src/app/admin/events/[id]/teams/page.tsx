@@ -8,7 +8,15 @@ import { renameTeam, removeTeam, addTeamMember, removeTeamMember, makeTeamLeader
 export const metadata = { title: 'Teams — Admin', robots: { index: false } }
 export const dynamic = 'force-dynamic'
 
-type Profile = { username: string; full_name: string } | null
+type Profile = {
+  username: string
+  full_name: string
+  department: string | null
+  year_of_study: string | null
+  division: string | null
+  roll_no: string | null
+  contact: string | null
+} | null
 
 export default async function EventTeamsPage({ params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdmin())) redirect('/admin')
@@ -30,7 +38,7 @@ export default async function EventTeamsPage({ params }: { params: Promise<{ id:
   const { data: teams, error: teamsError } = await supabase
     .from('event_teams')
     .select(
-      'id, name, created_at, created_by, event_team_members(id, status, user_id, invited_at, responded_at, profiles!event_team_members_user_id_fkey(username, full_name))',
+      'id, name, created_at, created_by, event_team_members(id, status, user_id, invited_at, responded_at, profiles!event_team_members_user_id_fkey(username, full_name, department, year_of_study, division, roll_no, contact))',
     )
     .eq('event_id', eventId)
     .order('created_at', { ascending: true })
@@ -92,6 +100,11 @@ export default async function EventTeamsPage({ params }: { params: Promise<{ id:
                   isLeader: m.user_id === t.created_by,
                   username: (m.profiles as unknown as Profile)?.username ?? '(deleted user)',
                   fullName: (m.profiles as unknown as Profile)?.full_name ?? '',
+                  department: (m.profiles as unknown as Profile)?.department ?? null,
+                  yearOfStudy: (m.profiles as unknown as Profile)?.year_of_study ?? null,
+                  division: (m.profiles as unknown as Profile)?.division ?? null,
+                  rollNo: (m.profiles as unknown as Profile)?.roll_no ?? null,
+                  contact: (m.profiles as unknown as Profile)?.contact ?? null,
                 })),
               }}
               eventId={eventId}
