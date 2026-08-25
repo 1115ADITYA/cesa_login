@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getClient, getUser } from '@/utils/supabase/server'
+import { isProfileComplete, missingProfileFields } from '@/lib/profileFields'
 import RegisterForm from './RegisterForm'
 import TeamPanel from './TeamPanel'
 import {
@@ -27,11 +28,16 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   const [supabase, user] = await Promise.all([getClient(), getUser()])
   if (!user) redirect('/')
 
-  const [{ data: eventRow }, { data: teamJson }] = await Promise.all([
+  const [{ data: eventRow }, { data: teamJson }, { data: profile }] = await Promise.all([
     supabase.from('events').select('*').eq('id', id).maybeSingle(),
     // Membership-based, not "did I create it" — joining a friend's team used to
     // leave you looking unregistered, with the register form still offered.
     supabase.rpc('get_event_team', { p_event_id: id }),
+    supabase
+      .from('profiles')
+      .select('full_name, department, year_of_study, division, roll_no, contact')
+      .eq('id', user.id)
+      .maybeSingle(),
   ])
 
   if (!eventRow) notFound()
@@ -116,6 +122,9 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
               eventId={id}
               minTeamSize={event.min_team_size}
               maxTeamSize={event.max_team_size}
+              profile={profile}
+              profileComplete={isProfileComplete(profile)}
+              missingFields={missingProfileFields(profile)}
             />
           ) : (
             <div className="glass p-6 text-center">

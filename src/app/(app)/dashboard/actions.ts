@@ -57,3 +57,47 @@ export async function updateUsername(newUsername: string) {
   revalidatePath('/dashboard')
   return { success: true }
 }
+
+/**
+ * Saves the student details that event registration prefills from. Goes
+ * through a SECURITY DEFINER RPC rather than a direct update because
+ * `profiles` has no member-facing UPDATE policy — see
+ * 0006_profile_details.sql for why adding a general one would be worse.
+ */
+export async function saveProfileDetails(details: {
+  fullName: string
+  department: string
+  yearOfStudy: string
+  division: string
+  rollNo: string
+  contact: string
+}): Promise<{ error: string } | { success: true }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { error } = await supabase.rpc('save_my_profile_details', {
+    p_full_name: details.fullName,
+    p_department: details.department,
+    p_year_of_study: details.yearOfStudy,
+    p_division: details.division,
+    p_roll_no: details.rollNo,
+    p_contact: details.contact,
+  })
+
+  if (error) {
+    // The RPC raises readable messages ("Please enter your name"), and the
+    // check constraints raise 23514 for an option outside the allowed lists —
+    // which can only happen if the form was bypassed, so a generic message is
+    // right there.
+    const message = error.code === '23514'
+      ? 'One of those selections is not valid. Please pick from the options listed.'
+      : error.message.replace(/^.*?(?:ERROR|error):\s*/, '').trim() || 'Could not save your details.'
+    return { error: message }
+  }
+
+  revalidatePath('/dashboard')
+  revalidatePath('/profile')
+  revalidatePath('/events', 'layout')
+  return { success: true }
+}

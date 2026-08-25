@@ -4,6 +4,7 @@ import { getClient, getUser } from '@/utils/supabase/server'
 import { ProfileCard } from '@/app/(app)/dashboard/profile-card'
 import { CardGridSkeleton } from '@/components/Skeletons'
 import { loadEventBoard } from '@/lib/eventData'
+import ProfileDetailsForm from '@/components/ProfileDetailsForm'
 
 export const metadata = { title: 'Profile — CESA' }
 export const dynamic = 'force-dynamic'
@@ -14,7 +15,8 @@ export default function ProfilePage() {
       <div className="mb-7">
         <h1 className="heading on-art text-3xl sm:text-4xl">Profile</h1>
         <p className="on-art mt-2 text-[var(--text)]">
-          Your username is how teammates find and invite you, so keep it something they will recognise.
+          Your username is how teammates find and invite you. The details below are filled into every
+          event registration, so you only enter them once.
         </p>
       </div>
 
@@ -43,6 +45,14 @@ async function ProfileContent() {
         <ProfileCard profile={profile} userEmail={user.email || ''} />
 
         <div className="flex flex-col gap-6 md:col-span-2">
+          <section className="glass p-6">
+            <h2 className="mb-1 font-bold text-white">Your details</h2>
+            <p className="mb-5 text-sm text-[var(--text-muted)]">
+              Used to prefill event registrations. Organisers see these on the roster.
+            </p>
+            <ProfileDetailsForm profile={profile} />
+          </section>
+
           <section className="glass p-6">
             <h2 className="mb-4 font-bold text-white">At a glance</h2>
             <div className="grid grid-cols-3 gap-3">
