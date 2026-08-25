@@ -15,10 +15,13 @@ export default function ProfileDetailsForm({
   profile,
   onSaved,
   submitLabel = 'Save details',
+  redirectTo,
 }: {
   profile: Partial<ProfileDetails> | null
   onSaved?: () => void
   submitLabel?: string
+  /** Where to go once saved — used by the mandatory gate at /complete-profile. */
+  redirectTo?: string
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -43,6 +46,10 @@ export default function ProfileDetailsForm({
         return
       }
       setSaved(true)
+      if (redirectTo) {
+        router.replace(redirectTo)
+        return
+      }
       router.refresh()
       onSaved?.()
     })
