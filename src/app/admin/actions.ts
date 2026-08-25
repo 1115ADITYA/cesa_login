@@ -297,3 +297,40 @@ export async function searchProfiles(query: string, eventId: string) {
     onATeam: takenIds.has(p.id),
   }))
 }
+
+/**
+ * Sends a notification to members — everyone, or just the people registered
+ * for one event. Fans out one row per recipient (see broadcast_announcement in
+ * 0008), which is what makes it land in each person's bell instantly via the
+ * realtime subscription.
+ */
+export async function sendAnnouncement(prevState: unknown, formData: FormData) {
+  await requireAdmin()
+
+  const title = String(formData.get('title') || '').trim()
+  const body = String(formData.get('body') || '').trim()
+  const audience = String(formData.get('audience') || 'all')
+  const eventId = audience === 'all' ? null : audience
+
+  if (!title) return { error: 'Give the announcement a title.' }
+  if (!body) return { error: 'Write a message to send.' }
+
+  const supabase = createAdminClient()
+  const { data, error } = await supabase.rpc('broadcast_announcement', {
+    p_title: title,
+    p_body: body,
+    p_event_id: eventId,
+  })
+
+  if (error) {
+    return { error: error.message.replace(/^.*?(?:ERROR|error):\s*/, '').trim() || 'Could not send the announcement.' }
+  }
+
+  const count = typeof data === 'number' ? data : 0
+  revalidatePath('/admin/announce')
+  return {
+    success: count === 0
+      ? 'Nobody matched that audience, so no notifications were sent.'
+      : `Sent to ${count} member${count === 1 ? '' : 's'}.`,
+  }
+}
