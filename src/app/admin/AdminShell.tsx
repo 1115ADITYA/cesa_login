@@ -13,7 +13,7 @@ export default function AdminShell({
   active = 'events',
   children,
 }: {
-  active?: 'events'
+  active?: 'events' | 'announce'
   children: React.ReactNode
 }) {
   return (
@@ -30,18 +30,24 @@ export default function AdminShell({
           </Link>
 
           <nav className="flex flex-1 items-center gap-1 pl-3">
-            <Link
-              href="/admin/events"
-              aria-current={active === 'events' ? 'page' : undefined}
-              className={`relative rounded-xl px-3.5 py-2 text-sm font-semibold transition-colors ${
-                active === 'events' ? 'text-white' : 'text-[var(--text-muted)] hover:text-white'
-              }`}
-            >
-              Events
-              {active === 'events' && (
-                <span className="absolute inset-x-3.5 -bottom-[1.35rem] h-[2px] rounded-full bg-gradient-to-r from-[var(--accent-deep)] to-[var(--accent-light)]" />
-              )}
-            </Link>
+            {([
+              { href: '/admin/events', label: 'Events', key: 'events' },
+              { href: '/admin/announce', label: 'Notify', key: 'announce' },
+            ] as const).map((tab) => (
+              <Link
+                key={tab.key}
+                href={tab.href}
+                aria-current={active === tab.key ? 'page' : undefined}
+                className={`relative rounded-xl px-3.5 py-2 text-sm font-semibold transition-colors ${
+                  active === tab.key ? 'text-white' : 'text-[var(--text-muted)] hover:text-white'
+                }`}
+              >
+                {tab.label}
+                {active === tab.key && (
+                  <span className="absolute inset-x-3.5 -bottom-[1.35rem] h-[2px] rounded-full bg-gradient-to-r from-[var(--accent-deep)] to-[var(--accent-light)]" />
+                )}
+              </Link>
+            ))}
           </nav>
 
           <div className="flex items-center gap-2.5">
