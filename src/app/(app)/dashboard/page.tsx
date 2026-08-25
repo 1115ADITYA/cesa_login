@@ -4,9 +4,6 @@ import { Band, EmptyState } from '@/components/AppShell'
 import EventCard from '@/app/(app)/events/EventCard'
 import EventRow from '@/components/EventRow'
 import { BandsSkeleton } from '@/components/Skeletons'
-import CompleteProfilePrompt from './CompleteProfilePrompt'
-import { getClient, getUser } from '@/utils/supabase/server'
-import { isProfileComplete, missingProfileFields } from '@/lib/profileFields'
 import { loadEventBoard } from '@/lib/eventData'
 
 export const metadata = { title: 'Home — CESA' }
@@ -30,22 +27,9 @@ async function HomeContent() {
   // repeats a card that is already sitting in the rail above it.
   const browse = all.filter((e) => !byEvent.has(e.id)).slice(0, 6)
 
-  const [supabase, user] = await Promise.all([getClient(), getUser()])
-  const { data: profile } = user
-    ? await supabase
-        .from('profiles')
-        .select('full_name, department, year_of_study, division, roll_no, contact')
-        .eq('id', user.id)
-        .maybeSingle()
-    : { data: null }
-
   return (
     <>
       <div className="flex flex-col gap-6">
-        {!isProfileComplete(profile) && (
-          <CompleteProfilePrompt profile={profile} missing={missingProfileFields(profile)} />
-        )}
-
         <Band
           title="Your events"
           subtitle={

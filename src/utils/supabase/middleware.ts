@@ -33,7 +33,7 @@ export async function updateSession(request: NextRequest) {
 
   // Define protected and auth routes
   const isAuthRoute = request.nextUrl.pathname === '/' || request.nextUrl.pathname.startsWith('/auth')
-  const PROTECTED = ['/dashboard', '/events', '/my-events', '/my-teams', '/profile']
+  const PROTECTED = ['/dashboard', '/events', '/my-events', '/my-teams', '/profile', '/complete-profile']
   const isProtectedRoute = PROTECTED.some((p) => request.nextUrl.pathname.startsWith(p))
 
   if (!user && isProtectedRoute) {
