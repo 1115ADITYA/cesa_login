@@ -4,6 +4,8 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { registerForEvent } from '../actions'
 import { teamSizeLabel } from '@/lib/events'
+import Link from 'next/link'
+import type { ProfileDetails } from '@/lib/profileFields'
 
 /**
  * Step one, and only step one. Inviting friends used to happen in this same
@@ -15,10 +17,16 @@ export default function RegisterForm({
   eventId,
   minTeamSize,
   maxTeamSize,
+  profile,
+  profileComplete,
+  missingFields,
 }: {
   eventId: string
   minTeamSize: number
   maxTeamSize: number | null
+  profile: Partial<ProfileDetails> | null
+  profileComplete: boolean
+  missingFields: string[]
 }) {
   const router = useRouter()
   const solo = maxTeamSize === 1
@@ -77,7 +85,36 @@ export default function RegisterForm({
         </div>
       )}
 
-      <button type="submit" disabled={pending} className="btn btn-primary !py-3">
+      {/* The point of holding these on the profile: shown back for confirmation
+          rather than re-entered per event. */}
+      {profileComplete ? (
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-sunken)] p-4">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <span className="label">Registering as</span>
+            <Link href="/profile" className="text-xs font-bold text-[var(--accent)] hover:underline">
+              Edit
+            </Link>
+          </div>
+          <p className="text-sm font-semibold text-white">{profile?.full_name}</p>
+          <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+            {profile?.department} · {profile?.year_of_study} · Div {profile?.division} · Roll {profile?.roll_no}
+          </p>
+          <p className="mt-0.5 text-xs text-[var(--text-muted)]">{profile?.contact}</p>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-[var(--warning)]/25 bg-[var(--warning)]/8 p-4">
+          <p className="text-sm font-semibold text-[var(--warning)]">Complete your profile first</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Organisers need {missingFields.join(', ').toLowerCase()} on the roster. Fill it in once and every
+            future event is prefilled.
+          </p>
+          <Link href="/profile" className="btn btn-primary mt-3 !py-2 !text-xs">
+            Complete profile
+          </Link>
+        </div>
+      )}
+
+      <button type="submit" disabled={pending || !profileComplete} className="btn btn-primary !py-3">
         {pending ? 'Registering…' : solo ? 'Register' : 'Register & pick teammates'}
       </button>
     </form>
