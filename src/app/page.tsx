@@ -9,10 +9,19 @@ export default function AuthPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  const [view, setView] = useState<'signin' | 'signup' | 'forgot'>('signin')
+  const [view, setView] = useState<'signin' | 'signup' | 'forgot' | 'otp'>('signin')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+
+  // Email-code sign-in. Works for both new and returning accounts — the
+  // send-otp route uses Supabase's generateLink(), which creates the auth
+  // user on first use — so this one flow covers what used to need separate
+  // "sign up" and "forgot password" paths.
+  const [otpStep, setOtpStep] = useState<'request' | 'verify'>('request')
+  const [otpCode, setOtpCode] = useState('')
+  const [otpSession, setOtpSession] = useState<string | null>(null)
+  const [otpCooldown, setOtpCooldown] = useState(0)
 
   // Form states
   const [email, setEmail] = useState('')
@@ -143,6 +152,75 @@ export default function AuthPage() {
     setLoading(false)
   }
 
+  // Countdown for the "resend code" cooldown, mirrored client-side from the
+  // server's 60s window so the button disables immediately rather than
+  // waiting for a rejected request to find out.
+  useEffect(() => {
+    if (otpCooldown <= 0) return
+    const timer = setTimeout(() => setOtpCooldown((s) => s - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [otpCooldown])
+
+  const handleSendOtp = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    setLoading(true)
+    setError(null)
+    setMessage(null)
+
+    try {
+      const res = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Could not send the code.')
+
+      setOtpSession(data.session)
+      setOtpStep('verify')
+      setOtpCooldown(60)
+      setMessage(`Code sent to ${email}.`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not send the code.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!otpSession) return
+    setLoading(true)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp: otpCode, session: otpSession }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Verification failed.')
+
+      // Exchanges the proven code for a real Supabase session. This runs
+      // through the browser client (@supabase/ssr), which writes the session
+      // to cookies rather than localStorage — the same mechanism the
+      // password and Google flows rely on — so middleware and server
+      // components see it immediately, no redirect round trip needed.
+      const { error: sessionError } = await supabase.auth.verifyOtp({
+        token_hash: data.tokenHash,
+        type: 'magiclink',
+      })
+      if (sessionError) throw sessionError
+
+      router.push('/dashboard')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Verification failed.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleGoogleOAuth = async () => {
     setLoading(true)
     setError(null)
@@ -250,7 +328,15 @@ export default function AuthPage() {
                   Continue with Google
                 </button>
 
-                <p className="text-center text-sm text-[#A68F8C] mt-4">
+                <button
+                  type="button"
+                  onClick={() => { setView('otp'); setOtpStep('request'); setOtpCode(''); setOtpSession(null); setError(null); setMessage(null) }}
+                  className="w-full flex items-center justify-center gap-2 text-[#A68F8C] font-semibold py-2 rounded-xl hover:text-[#F3E9E8] transition-colors text-sm"
+                >
+                  Or sign in with an emailed code
+                </button>
+
+                <p className="text-center text-sm text-[#A68F8C] mt-2">
                   Don&apos;t have an account?{' '}
                   <button type="button" onClick={() => { setView('signup'); setError(null); setMessage(null) }} className="text-[#E87A8C] font-bold hover:underline underline-offset-4">Sign Up</button>
                 </p>
@@ -279,10 +365,14 @@ export default function AuthPage() {
                   <div className="flex-grow border-t border-white/5"></div>
                 </div>
 
-                <div className="flex flex-col items-center justify-center p-6 border border-dashed border-white/10 rounded-2xl bg-black/20">
+                <button
+                  type="button"
+                  onClick={() => { setView('otp'); setOtpStep('request'); setOtpCode(''); setOtpSession(null); setError(null); setMessage(null) }}
+                  className="w-full flex flex-col items-center justify-center p-6 border border-dashed border-white/10 rounded-2xl bg-black/20 hover:border-[#E87A8C]/40 hover:bg-black/30 transition-colors"
+                >
                   <span className="text-[#8C7A77] text-sm font-semibold mb-1">Email Registration</span>
-                  <span className="bg-gradient-to-r from-[#D16475] to-[#E87A8C] text-transparent bg-clip-text text-lg font-bold">Coming Soon</span>
-                </div>
+                  <span className="bg-gradient-to-r from-[#D16475] to-[#E87A8C] text-transparent bg-clip-text text-lg font-bold">Continue with an emailed code</span>
+                </button>
 
                 <p className="text-center text-sm text-[#A68F8C] mt-2">
                   Already have an account?{' '}
@@ -323,6 +413,85 @@ export default function AuthPage() {
                   Remember your password?{' '}
                   <button type="button" onClick={() => { setView('signin'); setError(null); setMessage(null) }} className="text-[#E87A8C] font-bold hover:underline underline-offset-4">Sign In</button>
                 </p>
+              </form>
+            )}
+
+            {view === 'otp' && otpStep === 'request' && (
+              <form onSubmit={handleSendOtp} className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <div>
+                  <h1 className="font-[family-name:var(--font-space-grotesk)] text-3xl font-bold mb-2 tracking-tight text-[#FDF8F8]">Sign in with a code</h1>
+                  <p className="text-[#A68F8C] text-sm">
+                    We&apos;ll email you a 6-digit code — works whether or not you already have an account.
+                  </p>
+                </div>
+
+                {error && <div className="text-sm text-red-400 bg-red-400/10 p-3 rounded-xl border border-red-400/20">{error}</div>}
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-[#8C7A77] uppercase tracking-wider">Email</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    required
+                    className="w-full p-3.5 rounded-xl border border-white/5 bg-black/30 text-[#F3E9E8] text-sm outline-none transition-all focus:border-[#E87A8C] focus:bg-black/50 focus:ring-1 focus:ring-[#E87A8C]/50 placeholder-[#6B5A58]"
+                  />
+                </div>
+
+                <button disabled={loading} type="submit" className="w-full mt-2 bg-gradient-to-r from-[#D16475] via-[#E87A8C] to-[#F4A5AE] text-white font-bold py-3.5 rounded-xl shadow-[0_8px_20px_rgba(232,122,140,0.2)] hover:shadow-[0_8px_25px_rgba(232,122,140,0.35)] transition-all hover:-translate-y-0.5 active:translate-y-0 bg-[length:200%_auto] hover:bg-[position:right_center] disabled:opacity-50 disabled:cursor-not-allowed">
+                  {loading ? 'Sending code...' : 'Send code'}
+                </button>
+
+                <p className="text-center text-sm text-[#A68F8C] mt-2">
+                  <button type="button" onClick={() => { setView('signin'); setError(null); setMessage(null) }} className="text-[#E87A8C] font-bold hover:underline underline-offset-4">← Back</button>
+                </p>
+              </form>
+            )}
+
+            {view === 'otp' && otpStep === 'verify' && (
+              <form onSubmit={handleVerifyOtp} className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <div>
+                  <h1 className="font-[family-name:var(--font-space-grotesk)] text-3xl font-bold mb-2 tracking-tight text-[#FDF8F8]">Enter your code</h1>
+                  <p className="text-[#A68F8C] text-sm">Sent to {email}. It expires in 10 minutes.</p>
+                </div>
+
+                {error && <div className="text-sm text-red-400 bg-red-400/10 p-3 rounded-xl border border-red-400/20">{error}</div>}
+                {message && <div className="text-sm text-green-400 bg-green-400/10 p-3 rounded-xl border border-green-400/20">{message}</div>}
+
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  required
+                  autoFocus
+                  placeholder="000000"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                  className="w-full p-3.5 rounded-xl border border-white/5 bg-black/30 text-[#F3E9E8] text-center text-2xl font-mono tracking-[0.5em] outline-none transition-all focus:border-[#E87A8C] focus:bg-black/50 focus:ring-1 focus:ring-[#E87A8C]/50"
+                />
+
+                <button disabled={loading || otpCode.length !== 6} type="submit" className="w-full bg-gradient-to-r from-[#D16475] via-[#E87A8C] to-[#F4A5AE] text-white font-bold py-3.5 rounded-xl shadow-[0_8px_20px_rgba(232,122,140,0.2)] hover:shadow-[0_8px_25px_rgba(232,122,140,0.35)] transition-all hover:-translate-y-0.5 active:translate-y-0 bg-[length:200%_auto] hover:bg-[position:right_center] disabled:opacity-50 disabled:cursor-not-allowed">
+                  {loading ? 'Verifying...' : 'Verify & sign in'}
+                </button>
+
+                <div className="flex items-center justify-between text-sm">
+                  <button
+                    type="button"
+                    onClick={() => { setOtpStep('request'); setOtpCode(''); setError(null); setMessage(null) }}
+                    className="text-[#A68F8C] hover:text-[#F3E9E8] transition-colors"
+                  >
+                    Change email
+                  </button>
+                  <button
+                    type="button"
+                    disabled={otpCooldown > 0 || loading}
+                    onClick={() => handleSendOtp()}
+                    className="text-[#E87A8C] font-bold hover:underline underline-offset-4 disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed"
+                  >
+                    {otpCooldown > 0 ? `Resend in ${otpCooldown}s` : 'Resend code'}
+                  </button>
+                </div>
               </form>
             )}
 
