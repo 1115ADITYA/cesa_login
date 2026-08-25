@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { encryptPayload } from '@/lib/otpCrypto'
 import { checkOtpRateLimit } from '@/lib/otpRateLimit'
-import { sendOtpEmail } from '@/lib/mailer'
+import { activeProvider, sendOtpEmail } from '@/lib/mailer'
 
 const OTP_TTL_MS = 10 * 60 * 1000
 
@@ -29,8 +29,11 @@ export async function POST(request: NextRequest) {
   // locks them out of retrying once it is fixed — and the generic "could not
   // send" this used to return gave no hint that the cause was configuration
   // rather than a transient Gmail problem.
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
-    console.error('OTP send blocked: GMAIL_USER / GMAIL_APP_PASSWORD are not set in this environment.')
+  if (activeProvider() === null) {
+    console.error(
+      'OTP send blocked: no email provider configured. Set BREVO_API_KEY + EMAIL_FROM_ADDRESS (production), ' +
+        'or GMAIL_USER + GMAIL_APP_PASSWORD (local only — Google rejects SMTP auth from data-centre IPs).',
+    )
     return NextResponse.json(
       { error: 'Email sign-in is not configured on this server. Please use Google sign-in, or contact the organisers.' },
       { status: 503 },
