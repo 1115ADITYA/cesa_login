@@ -2,7 +2,18 @@
 
 import { useEffect, useState, useTransition } from 'react'
 
-type Member = { id: string; status: string; isLeader: boolean; username: string; fullName: string }
+type Member = {
+  id: string
+  status: string
+  isLeader: boolean
+  username: string
+  fullName: string
+  department: string | null
+  yearOfStudy: string | null
+  division: string | null
+  rollNo: string | null
+  contact: string | null
+}
 type Team = { id: string; name: string; leaderId: string; members: Member[] }
 type Suggestion = { username: string; fullName: string; onATeam: boolean }
 
@@ -173,6 +184,21 @@ export default function TeamRow({
                 )}
               </p>
               {m.fullName && <p className="truncate text-xs text-[var(--text-faint)]">{m.fullName}</p>}
+              {/* The details members enter once on their profile — here so an
+                  organiser has the roster and contact list in one place. */}
+              {(m.department || m.rollNo || m.contact) && (
+                <p className="mt-0.5 truncate text-xs text-[var(--text-faint)]">
+                  {[
+                    m.department,
+                    m.yearOfStudy,
+                    m.division && `Div ${m.division}`,
+                    m.rollNo && `Roll ${m.rollNo}`,
+                    m.contact,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+              )}
             </div>
 
             <span
