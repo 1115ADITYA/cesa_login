@@ -1,5 +1,6 @@
 import { getClient, getUser } from '@/utils/supabase/server'
 import LiveRefresh from './LiveRefresh'
+import { getMyProfile } from '@/lib/profile'
 import NavBar, { type NavInvite, type NavNotification, type NavProfile } from './NavBar'
 
 type NotificationRow = {
@@ -32,8 +33,10 @@ export default async function SiteNav() {
   const [supabase, user] = await Promise.all([getClient(), getUser()])
   if (!user) return null
 
-  const [{ data: profileRow }, { data: invitationRows }, { data: notificationRows }] = await Promise.all([
-    supabase.from('profiles').select('username, full_name, avatar_url, role').eq('id', user.id).maybeSingle(),
+  const [profileRow, { data: invitationRows }, { data: notificationRows }] = await Promise.all([
+    // Shared with the completion gate in the layout via React cache(), so this
+    // is one query per request rather than two.
+    getMyProfile(),
     supabase.rpc('get_my_invitations'),
     // RLS scopes this to the caller (notifications_read_own), so no filter is
     // needed here beyond the ordering and cap.
