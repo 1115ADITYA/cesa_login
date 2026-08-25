@@ -24,6 +24,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'A valid email address is required.' }, { status: 400 })
   }
 
+  // Checked before the rate limiter, not after. A misconfigured deployment
+  // cannot send anything, so consuming the caller's 60s cooldown for it just
+  // locks them out of retrying once it is fixed — and the generic "could not
+  // send" this used to return gave no hint that the cause was configuration
+  // rather than a transient Gmail problem.
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+    console.error('OTP send blocked: GMAIL_USER / GMAIL_APP_PASSWORD are not set in this environment.')
+    return NextResponse.json(
+      { error: 'Email sign-in is not configured on this server. Please use Google sign-in, or contact the organisers.' },
+      { status: 503 },
+    )
+  }
+
   // Vercel sets x-forwarded-for; a direct/local request has no proxy, hence
   // the fallback rather than leaving the IP bucket empty.
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '127.0.0.1'
@@ -63,7 +76,11 @@ export async function POST(request: NextRequest) {
   try {
     await sendOtpEmail(email, otp)
   } catch (err) {
-    console.error('OTP email send failed:', err)
+    // Gmail's own codes are the useful signal here: EAUTH/535 means the app
+    // password is wrong or revoked, ECONN* means the SMTP connection itself
+    // was refused (the cloud-IP problem this design exists to avoid).
+    const code = (err as { code?: string })?.code
+    console.error(`OTP email send failed${code ? ` (${code})` : ''}:`, err)
     return NextResponse.json({ error: 'Could not send the verification email. Please try again shortly.' }, { status: 502 })
   }
 
