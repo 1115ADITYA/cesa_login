@@ -15,14 +15,49 @@ admin panel for managing events and rosters.
      Auth users.
    - `ADMIN_USERNAME`, `ADMIN_PASSWORD` — the separate admin login, unrelated to
      any member's account. Pick your own before deploying.
+   - `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `EMAIL_FROM_NAME`, `OTP_ENCRYPTION_SECRET`
+     — only needed for email-code sign-in; see below.
 
-2. **Run the migrations, in order** — `supabase/migrations/0001_events.sql`
-   then `0002_team_flow.sql`, in the Supabase SQL editor (or `supabase db
-   push` if you use the CLI). They assume `public.profiles(id, username,
-   full_name, avatar_url, role)` already exists — the table the signup flow in
-   `app/page.tsx` already writes to. Both are idempotent.
+2. **Run the migrations, in order** — everything under `supabase/migrations/`,
+   `0001` through `0005`, in the Supabase SQL editor (or `supabase db push` if
+   you use the CLI). `0001` assumes `public.profiles(id, username, full_name,
+   avatar_url, role)` already exists — the table the signup flow in
+   `app/page.tsx` already writes to. All are idempotent.
 
 3. `npm install && npm run dev`.
+
+## Email-code sign-in
+
+A "Sign in with an emailed code" option alongside password and Google —
+`/api/auth/send-otp` and `/api/auth/verify-otp`, wired into `app/page.tsx`.
+Works for both new and returning accounts: Supabase's `admin.generateLink()`
+creates the Auth user on first use for type `magiclink`, so there is no
+separate signup step.
+
+Sends through Gmail SMTP via `nodemailer` rather than Supabase's built-in
+mailer — hosted mail services calling Google's SMTP from cloud IPs get hit
+with `535 BadCredentials` fairly often, and a personal Gmail account with an
+[app password](https://myaccount.google.com/apppasswords) sidesteps that
+entirely, for free. Set `GMAIL_USER` and `GMAIL_APP_PASSWORD`; use a real app
+password, never the account's login password.
+
+The 6-digit code and the Supabase `token_hash` it corresponds to round-trip
+through the browser as an AES-256-GCM–encrypted payload rather than a database
+row — the point being no OTP table to clean up. `OTP_ENCRYPTION_SECRET` is the
+key for that; generate one with `openssl rand -base64 32` and set it before
+deploying (it falls back to `SUPABASE_SERVICE_ROLE_KEY` only so local setup
+does not hard-fail without it).
+
+Two Gmail-specific limits worth knowing:
+- **500 emails / 24 hours** on a personal account (2000/day on Workspace).
+  `0005_otp_rate_limit.sql` enforces a 60s-per-email cooldown, 5/email/hour,
+  and 15/IP/hour in Postgres — atomic and durable across serverless
+  instances, unlike an in-process rate limiter, which a cold start or a
+  concurrent invocation would silently bypass.
+- Sending from serverless infrastructure still carries some of the same
+  cloud-IP suspicion the Supabase-mailer problem was about, just usually less
+  aggressively enforced against plain SMTP auth. The rate limits above are a
+  real mitigation, not a guarantee.
 
 ## The registration flow
 
