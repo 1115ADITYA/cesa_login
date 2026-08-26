@@ -33,12 +33,23 @@ export default function EventRow({
       href={`/events/${event.id}`}
       className="group flex items-stretch gap-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-sunken)] p-3.5 transition-all hover:border-[var(--accent)]/35 hover:bg-black/40 sm:gap-5 sm:p-4"
     >
-      <div className="flex w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-gradient-to-b from-[#D16475]/18 to-[#E87A8C]/6 py-3 sm:w-[4.5rem]">
-        <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[var(--accent-light)]">
-          {start.toLocaleDateString(undefined, { month: 'short' })}
-        </span>
-        <span className="heading text-2xl leading-none">{start.getDate()}</span>
-      </div>
+      {event.banner_url ? (
+        // Admin-supplied URLs from arbitrary hosts, so plain <img> rather than
+        // next/image — which would need every host allow-listed up front.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={event.banner_url}
+          alt=""
+          className="h-auto w-16 shrink-0 rounded-xl object-cover sm:w-[4.5rem]"
+        />
+      ) : (
+        <div className="flex w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-gradient-to-b from-[#D16475]/18 to-[#E87A8C]/6 py-3 sm:w-[4.5rem]">
+          <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[var(--accent-light)]">
+            {start.toLocaleDateString(undefined, { month: 'short' })}
+          </span>
+          <span className="heading text-2xl leading-none">{start.getDate()}</span>
+        </div>
+      )}
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">

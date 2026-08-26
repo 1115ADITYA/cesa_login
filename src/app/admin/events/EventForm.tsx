@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState } from 'react'
+import BannerUpload from './BannerUpload'
 
 type EventDefaults = {
   title?: string
@@ -88,9 +89,7 @@ export default function EventForm({
         <input name="location" defaultValue={defaults?.location} className={inputClass} />
       </Field>
 
-      <Field label="Banner image URL (optional)">
-        <input name="bannerUrl" defaultValue={defaults?.bannerUrl} className={inputClass} />
-      </Field>
+      <BannerUpload defaultUrl={defaults?.bannerUrl} />
 
       <button
         type="submit"

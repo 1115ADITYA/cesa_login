@@ -14,6 +14,38 @@ async function requireAdmin() {
   if (!(await isAdmin())) throw new Error('Not authorised')
 }
 
+const MAX_BANNER_BYTES = 5 * 1024 * 1024
+const ALLOWED_BANNER_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+
+/**
+ * Uploads a banner image straight to the `event-banners` bucket (see
+ * 0009_event_banners_bucket.sql) and hands back its public URL, which the
+ * form then submits like it always did — createEvent/updateEvent still just
+ * see a `bannerUrl` string, so the poster-flow path (registration page,
+ * EventRow, EventCard) needed no changes.
+ */
+export async function uploadEventBanner(formData: FormData): Promise<{ url: string } | { error: string }> {
+  await requireAdmin()
+
+  const file = formData.get('file')
+  if (!(file instanceof File) || file.size === 0) return { error: 'Choose an image to upload.' }
+  if (!ALLOWED_BANNER_TYPES.has(file.type)) return { error: 'Use a JPEG, PNG, WebP or GIF image.' }
+  if (file.size > MAX_BANNER_BYTES) return { error: 'Image must be 5MB or smaller.' }
+
+  const ext = file.type.split('/')[1] === 'jpeg' ? 'jpg' : file.type.split('/')[1]
+  const path = `${crypto.randomUUID()}.${ext}`
+
+  const supabase = createAdminClient()
+  const { error } = await supabase.storage.from('event-banners').upload(path, file, {
+    contentType: file.type,
+    cacheControl: '31536000',
+  })
+  if (error) return { error: `Upload failed: ${error.message}` }
+
+  const { data } = supabase.storage.from('event-banners').getPublicUrl(path)
+  return { url: data.publicUrl }
+}
+
 type EventFields = {
   title: string
   description: string

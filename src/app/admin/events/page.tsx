@@ -70,12 +70,17 @@ export default async function AdminEventsPage() {
 
             return (
               <div key={e.id} className="glass card-hover flex flex-wrap items-center gap-4 p-4 sm:p-5">
-                <div className="flex w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-gradient-to-b from-[var(--accent-deep)]/18 to-[var(--accent)]/6 py-3">
-                  <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[var(--accent-light)]">
-                    {start.toLocaleDateString(undefined, { month: 'short' })}
-                  </span>
-                  <span className="heading text-2xl leading-none">{start.getDate()}</span>
-                </div>
+                {e.banner_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={e.banner_url} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" />
+                ) : (
+                  <div className="flex w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-gradient-to-b from-[var(--accent-deep)]/18 to-[var(--accent)]/6 py-3">
+                    <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[var(--accent-light)]">
+                      {start.toLocaleDateString(undefined, { month: 'short' })}
+                    </span>
+                    <span className="heading text-2xl leading-none">{start.getDate()}</span>
+                  </div>
+                )}
 
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
