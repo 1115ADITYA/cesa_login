@@ -61,7 +61,7 @@ export default async function AdminEventsPage() {
           </Link>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {all.map((e) => {
             const ids = teamsByEvent.get(e.id) ?? []
             const confirmed = ids.filter((id) => (acceptedByTeam.get(id) ?? 0) >= e.min_team_size).length
@@ -69,45 +69,50 @@ export default async function AdminEventsPage() {
             const start = new Date(e.starts_at)
 
             return (
-              <div key={e.id} className="glass card-hover flex flex-wrap items-center gap-4 p-4 sm:p-5">
+              <div key={e.id} className="glass card-hover flex flex-col overflow-hidden">
                 {e.banner_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={e.banner_url} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" />
+                  <img
+                    src={e.banner_url}
+                    alt=""
+                    style={{ objectPosition: e.banner_position ?? '50% 50%' }}
+                    className="h-32 w-full object-cover"
+                  />
                 ) : (
-                  <div className="flex w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-gradient-to-b from-[var(--accent-deep)]/18 to-[var(--accent)]/6 py-3">
+                  <div className="flex h-32 w-full flex-col items-center justify-center bg-gradient-to-b from-[var(--accent-deep)]/18 to-[var(--accent)]/6">
                     <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[var(--accent-light)]">
                       {start.toLocaleDateString(undefined, { month: 'short' })}
                     </span>
-                    <span className="heading text-2xl leading-none">{start.getDate()}</span>
+                    <span className="heading text-3xl leading-none">{start.getDate()}</span>
                   </div>
                 )}
 
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="font-bold text-white">{e.title}</h2>
-                    <span className={`pill ${status.tone}`}>{status.label}</span>
+                <div className="flex flex-1 flex-col p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <h2 className="font-bold leading-snug text-white">{e.title}</h2>
+                    <span className={`pill shrink-0 ${status.tone}`}>{status.label}</span>
                   </div>
-                  <p className="mt-1 text-sm text-[var(--text-muted)]">
+                  <p className="mt-1.5 text-sm text-[var(--text-muted)]">
                     {formatDateRange(e.starts_at, e.ends_at)}
                     {e.location ? ` · ${e.location}` : ''} · {teamSizeLabel(e.min_team_size, e.max_team_size)}
                   </p>
-                  <p className="mt-1.5 text-xs text-[var(--text-faint)]">
+                  <p className="mt-2 text-xs text-[var(--text-faint)]">
                     <span className="font-bold text-[var(--text)]">{ids.length}</span> registered ·{' '}
                     <span className="font-bold text-[var(--success)]">{confirmed}</span> confirmed
                     {ids.length - confirmed > 0 && (
                       <span className="text-[var(--warning)]"> · {ids.length - confirmed} still forming</span>
                     )}
                   </p>
-                </div>
 
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <Link href={`/admin/events/${e.id}/teams`} className="btn btn-ghost !px-3 !py-2 !text-xs">
-                    Teams
-                  </Link>
-                  <Link href={`/admin/events/${e.id}/edit`} className="btn btn-ghost !px-3 !py-2 !text-xs">
-                    Edit
-                  </Link>
-                  <DeleteEventButton eventId={e.id} action={deleteEvent} />
+                  <div className="mt-4 flex items-center gap-2 border-t border-[var(--border)] pt-3 text-sm font-semibold">
+                    <Link href={`/admin/events/${e.id}/teams`} className="btn btn-ghost !px-3 !py-2 !text-xs">
+                      Teams
+                    </Link>
+                    <Link href={`/admin/events/${e.id}/edit`} className="btn btn-ghost !px-3 !py-2 !text-xs">
+                      Edit
+                    </Link>
+                    <DeleteEventButton eventId={e.id} action={deleteEvent} />
+                  </div>
                 </div>
               </div>
             )

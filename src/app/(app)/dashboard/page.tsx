@@ -2,7 +2,6 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { Band, EmptyState } from '@/components/AppShell'
 import EventCard from '@/app/(app)/events/EventCard'
-import EventRow from '@/components/EventRow'
 import { BandsSkeleton } from '@/components/Skeletons'
 import { loadEventBoard } from '@/lib/eventData'
 
@@ -86,9 +85,9 @@ async function HomeContent() {
               }
             />
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {browse.map((e) => (
-                <EventRow key={e.id} event={e} registration={null} now={now} />
+                <EventCard key={e.id} event={e} registration={null} now={now} />
               ))}
             </div>
           )}

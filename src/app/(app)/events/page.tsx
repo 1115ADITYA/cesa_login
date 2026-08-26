@@ -59,9 +59,9 @@ async function EventsContent() {
             {open.length === 0 ? (
               <EmptyState title="Nothing open right now" body="Registrations for the next event will open here." />
             ) : (
-              <div className="flex flex-col gap-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {open.map((e) => (
-                  <EventRow key={e.id} event={e} registration={byEvent.get(e.id) ?? null} now={now} />
+                  <EventCard key={e.id} event={e} registration={byEvent.get(e.id) ?? null} now={now} />
                 ))}
               </div>
             )}

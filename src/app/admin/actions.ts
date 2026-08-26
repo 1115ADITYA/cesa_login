@@ -51,11 +51,19 @@ type EventFields = {
   description: string
   location: string | null
   banner_url: string | null
+  banner_position: string
+  poster_url: string | null
   starts_at: string
   ends_at: string
   registration_closes_at: string | null
   min_team_size: number
   max_team_size: number | null
+}
+
+/** Only "N% N%" is ever written by BannerUpload.tsx — anything else is either absent or tampered with. */
+function toBannerPosition(raw: FormDataEntryValue | null): string {
+  const value = String(raw || '').trim()
+  return /^\d{1,3}% \d{1,3}%$/.test(value) ? value : '50% 50%'
 }
 
 /**
@@ -98,6 +106,8 @@ function toEventFields(formData: FormData): { error: string } | { fields: EventF
       description: String(formData.get('description') || '').trim(),
       location: String(formData.get('location') || '').trim() || null,
       banner_url: String(formData.get('bannerUrl') || '').trim() || null,
+      banner_position: toBannerPosition(formData.get('bannerPosition')),
+      poster_url: String(formData.get('posterUrl') || '').trim() || null,
       starts_at: startsAt.toISOString(),
       ends_at: endsAt.toISOString(),
       registration_closes_at: closesAt ? closesAt.toISOString() : null,

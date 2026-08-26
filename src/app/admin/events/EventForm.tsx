@@ -1,13 +1,15 @@
 'use client'
 
 import { useActionState } from 'react'
-import BannerUpload from './BannerUpload'
+import ImageUpload from './ImageUpload'
 
 type EventDefaults = {
   title?: string
   description?: string
   location?: string
   bannerUrl?: string
+  bannerPosition?: string
+  posterUrl?: string
   startsAt?: string
   endsAt?: string
   registrationClosesAt?: string
@@ -89,7 +91,22 @@ export default function EventForm({
         <input name="location" defaultValue={defaults?.location} className={inputClass} />
       </Field>
 
-      <BannerUpload defaultUrl={defaults?.bannerUrl} />
+      <ImageUpload
+        name="bannerUrl"
+        label="Banner image (optional)"
+        variant="banner"
+        defaultUrl={defaults?.bannerUrl}
+        positionName="bannerPosition"
+        defaultPosition={defaults?.bannerPosition}
+      />
+
+      <ImageUpload
+        name="posterUrl"
+        label="Full poster (optional)"
+        variant="poster"
+        hint="Shown uncropped beside the registration form, so entrants can read the prizes, rules and venue straight off the artwork."
+        defaultUrl={defaults?.posterUrl}
+      />
 
       <button
         type="submit"
