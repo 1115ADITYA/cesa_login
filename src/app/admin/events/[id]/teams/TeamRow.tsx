@@ -74,6 +74,15 @@ export default function TeamRow({
   // while a newer query is in flight, the stale list simply is not shown.
   const visible = suggestions && suggestions.query === q ? suggestions.results : []
 
+  useEffect(() => {
+    if (!selectedMember) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedMember(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectedMember])
+
   const run = (fn: () => Promise<void>) => {
     setError(null)
     startTransition(async () => {
@@ -308,11 +317,16 @@ export default function TeamRow({
       </div>
 
       {selectedMember && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" 
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-sm"
           onClick={() => setSelectedMember(null)}
         >
-          <div className="glass w-full max-w-md p-6 relative border border-[var(--border-strong)] shadow-2xl" onClick={e => e.stopPropagation()}>
+          {/* Deliberately not `.glass`: that is 66%-opaque by design, so the
+              roster underneath showed straight through the member's details. */}
+          <div
+            className="relative my-auto max-h-[85vh] w-full max-w-md overflow-y-auto rounded-[1.25rem] border border-[var(--border-strong)] bg-[var(--bg-elevated)] p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button 
               className="absolute top-4 right-4 text-[var(--text-faint)] hover:text-white transition-colors" 
               onClick={() => setSelectedMember(null)}

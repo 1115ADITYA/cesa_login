@@ -53,15 +53,10 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
 
   return (
     <>
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-6xl">
         <Link href="/events" className="text-sm text-[var(--text-muted)] transition-colors hover:text-white">
           ← All events
         </Link>
-
-        {event.banner_url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={event.banner_url} alt="" className="mt-4 h-48 w-full rounded-2xl object-cover" />
-        )}
 
         <div className="mt-5 flex flex-wrap items-center gap-2">
           {phase === 'live' && (
@@ -86,55 +81,85 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
           {event.title}
         </h1>
 
-        <dl className="mt-6 grid gap-4 sm:grid-cols-3">
-          <Meta label="When" value={formatDateRange(event.starts_at, event.ends_at)} />
-          <Meta label="Where" value={event.location || 'To be announced'} />
-          <Meta
-            label="Registration closes"
-            value={deadline.toLocaleString(undefined, {
-              day: 'numeric',
-              month: 'short',
-              hour: 'numeric',
-              minute: '2-digit',
-            })}
-          />
-        </dl>
+        {/* Two columns from lg up: the action on the left, the poster pinned on
+            the right. The poster carries details that live only in the artwork
+            — prizes, rules, the venue map — so it stays in view while someone
+            fills the form rather than being scrolled past at the top. */}
+        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:items-start">
+          <div className="min-w-0">
+            <dl className="grid gap-4 sm:grid-cols-3">
+              <Meta label="When" value={formatDateRange(event.starts_at, event.ends_at)} />
+              <Meta label="Where" value={event.location || 'To be announced'} />
+              <Meta
+                label="Registration closes"
+                value={deadline.toLocaleString(undefined, {
+                  day: 'numeric',
+                  month: 'short',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                })}
+              />
+            </dl>
 
-        {event.description && (
-          <div className="mt-8">
-            <h2 className="eyebrow mb-2">About</h2>
-            <p className="on-art whitespace-pre-wrap leading-relaxed text-[var(--text)]">{event.description}</p>
-          </div>
-        )}
+            {event.description && (
+              <div className="mt-8">
+                <h2 className="eyebrow mb-2">About</h2>
+                <p className="on-art whitespace-pre-wrap leading-relaxed text-[var(--text)]">{event.description}</p>
+              </div>
+            )}
 
-        <div className="mt-10">
-          {team ? (
-            <TeamPanel
-              eventId={id}
-              team={team}
-              minTeamSize={event.min_team_size}
-              maxTeamSize={event.max_team_size}
-              registrationOpen={registrationOpen}
-              eventStarted={phase !== 'upcoming'}
-            />
-          ) : registrationOpen ? (
-            <RegisterForm
-              eventId={id}
-              minTeamSize={event.min_team_size}
-              maxTeamSize={event.max_team_size}
-              profile={profile}
-              profileComplete={isProfileComplete(profile)}
-              missingFields={missingProfileFields(profile)}
-            />
-          ) : (
-            <div className="glass p-6 text-center">
-              <p className="font-semibold text-white">Registration is closed</p>
-              <p className="mt-1 text-sm text-[var(--text-muted)]">
-                {phase === 'past'
-                  ? 'This event has already finished.'
-                  : 'The deadline for this event has passed.'}
-              </p>
+            <div className="mt-8">
+              {team ? (
+                <TeamPanel
+                  eventId={id}
+                  team={team}
+                  minTeamSize={event.min_team_size}
+                  maxTeamSize={event.max_team_size}
+                  registrationOpen={registrationOpen}
+                  eventStarted={phase !== 'upcoming'}
+                />
+              ) : registrationOpen ? (
+                <RegisterForm
+                  eventId={id}
+                  minTeamSize={event.min_team_size}
+                  maxTeamSize={event.max_team_size}
+                  profile={profile}
+                  profileComplete={isProfileComplete(profile)}
+                  missingFields={missingProfileFields(profile)}
+                />
+              ) : (
+                <div className="glass p-6 text-center">
+                  <p className="font-semibold text-white">Registration is closed</p>
+                  <p className="mt-1 text-sm text-[var(--text-muted)]">
+                    {phase === 'past'
+                      ? 'This event has already finished.'
+                      : 'The deadline for this event has passed.'}
+                  </p>
+                </div>
+              )}
             </div>
+          </div>
+
+          {event.poster_url && (
+            <a
+              href={event.poster_url}
+              target="_blank"
+              rel="noreferrer"
+              className="glass group block overflow-hidden p-2 lg:sticky lg:top-6"
+            >
+              {/* 9:16 slot, and object-contain inside it — the whole poster
+                  stays visible because the detail someone came for (prizes,
+                  venue, rules) might sit in any corner of it. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={event.poster_url}
+                alt={`${event.title} poster`}
+                className="aspect-[9/16] w-full rounded-xl object-contain"
+              />
+              <p className="px-2 py-2 text-center text-xs text-[var(--text-faint)] transition-colors group-hover:text-[var(--text-muted)]">
+                Tap to open full size
+              </p>
+            </a>
           )}
         </div>
       </div>

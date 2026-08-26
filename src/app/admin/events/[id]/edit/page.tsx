@@ -28,6 +28,8 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
             description: event.description,
             location: event.location ?? '',
             bannerUrl: event.banner_url ?? '',
+            bannerPosition: event.banner_position ?? '50% 50%',
+            posterUrl: event.poster_url ?? '',
             startsAt: event.starts_at,
             endsAt: event.ends_at,
             registrationClosesAt: event.registration_closes_at ?? '',

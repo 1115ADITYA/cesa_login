@@ -40,6 +40,7 @@ export default function EventRow({
         <img
           src={event.banner_url}
           alt=""
+          style={{ objectPosition: event.banner_position ?? '50% 50%' }}
           className="h-auto w-16 shrink-0 rounded-xl object-cover sm:w-[4.5rem]"
         />
       ) : (

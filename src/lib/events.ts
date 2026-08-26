@@ -40,6 +40,8 @@ export type EventRow = {
   description: string
   location: string | null
   banner_url: string | null
+  banner_position: string | null
+  poster_url: string | null
   starts_at: string
   ends_at: string
   registration_closes_at: string | null
