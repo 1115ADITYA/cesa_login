@@ -366,29 +366,10 @@ export default function AuthPage() {
                   <div className="flex-grow border-t border-white/5"></div>
                 </div>
 
-                <form onSubmit={handleSendOtp} className="flex flex-col gap-3">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold text-[#8C7A77] uppercase tracking-wider">Email</label>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      required
-                      className="w-full p-3.5 rounded-xl border border-white/5 bg-black/30 text-[#F3E9E8] text-sm outline-none transition-all focus:border-[#E87A8C] focus:bg-black/50 focus:ring-1 focus:ring-[#E87A8C]/50 placeholder-[#6B5A58]"
-                    />
-                  </div>
-                  <button
-                    disabled={loading}
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-[#D16475] via-[#E87A8C] to-[#F4A5AE] text-white font-bold py-3.5 rounded-xl shadow-[0_8px_20px_rgba(232,122,140,0.2)] hover:shadow-[0_8px_25px_rgba(232,122,140,0.35)] transition-all hover:-translate-y-0.5 active:translate-y-0 bg-[length:200%_auto] hover:bg-[position:right_center] disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loading ? 'Sending code...' : 'Send verification code'}
-                  </button>
-                  <p className="text-center text-xs text-[#8C7A77]">
-                    We&apos;ll email you a 6-digit code. No password to remember.
-                  </p>
-                </form>
+                <div className="flex flex-col items-center justify-center p-6 border border-dashed border-white/10 rounded-2xl bg-black/20">
+                  <span className="text-[#8C7A77] text-sm font-semibold mb-1">Email Registration</span>
+                  <span className="bg-gradient-to-r from-[#D16475] to-[#E87A8C] text-transparent bg-clip-text text-lg font-bold">Coming Soon</span>
+                </div>
 
                 <p className="text-center text-sm text-[#A68F8C] mt-2">
                   Already have an account?{' '}
