@@ -5,7 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { AdminHeader } from '../AdminShell'
 import { deleteEvent } from '../actions'
 import DeleteEventButton from './DeleteEventButton'
-import { formatDateRange, teamSizeLabel, type EventRow } from '@/lib/events'
+import { BANNER_FRAME, formatDateRange, teamSizeLabel, type EventRow } from '@/lib/events'
 
 export const metadata = { title: 'Events — Admin', robots: { index: false } }
 export const dynamic = 'force-dynamic'
@@ -72,14 +72,9 @@ export default async function AdminEventsPage() {
               <div key={e.id} className="glass card-hover flex flex-col overflow-hidden">
                 {e.banner_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={e.banner_url}
-                    alt=""
-                    style={{ objectPosition: e.banner_position ?? '50% 50%' }}
-                    className="h-32 w-full object-cover"
-                  />
+                  <img src={e.banner_url} alt="" className={BANNER_FRAME} />
                 ) : (
-                  <div className="flex h-32 w-full flex-col items-center justify-center bg-gradient-to-b from-[var(--accent-deep)]/18 to-[var(--accent)]/6">
+                  <div className="flex aspect-[16/9] w-full flex-col items-center justify-center bg-gradient-to-b from-[var(--accent-deep)]/18 to-[var(--accent)]/6">
                     <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[var(--accent-light)]">
                       {start.toLocaleDateString(undefined, { month: 'short' })}
                     </span>

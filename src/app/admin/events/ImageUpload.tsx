@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { uploadEventBanner } from '../actions'
 import CropStage from './CropStage'
+import { BANNER_ASPECT } from '@/lib/events'
 
 /**
  * Replaces the old plain "paste a URL" fields. Uploads straight to storage and
@@ -19,8 +20,6 @@ import CropStage from './CropStage'
  * - `poster` is the full artwork shown uncropped beside the registration form,
  *   so it is uploaded exactly as chosen.
  */
-
-const BANNER_ASPECT = 16 / 9
 
 export default function ImageUpload({
   name,

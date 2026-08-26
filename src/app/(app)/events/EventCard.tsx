@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import TeamProgress from '@/components/TeamProgress'
 import {
+  BANNER_FRAME,
   eventPhase,
   formatDateRange,
   registrationDeadline,
@@ -30,12 +31,7 @@ export default function EventCard({
         // Admin-supplied URLs from arbitrary hosts, so plain <img> rather than
         // next/image — which would need every host allow-listed up front.
         // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={event.banner_url}
-          alt=""
-          style={{ objectPosition: event.banner_position ?? '50% 50%' }}
-          className="h-32 w-full object-cover"
-        />
+        <img src={event.banner_url} alt="" className={BANNER_FRAME} />
       )}
 
       <div className="flex flex-1 flex-col p-5">

@@ -4,6 +4,15 @@
  * a team's state with the same words.
  */
 
+/**
+ * Banners are cropped to exactly this ratio in CropStage, so every place that
+ * displays one has to use the same box — otherwise the browser re-crops what
+ * the admin framed. These two must agree; that is the whole point of them
+ * living here rather than as a literal at each site.
+ */
+export const BANNER_ASPECT = 16 / 9
+export const BANNER_FRAME = 'aspect-[16/9] w-full object-cover'
+
 export type MyRegistration = {
   event_id: string
   team_id: string
