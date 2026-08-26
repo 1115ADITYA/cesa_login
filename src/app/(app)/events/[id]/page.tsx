@@ -4,6 +4,7 @@ import { getClient, getUser } from '@/utils/supabase/server'
 import { isProfileComplete, missingProfileFields } from '@/lib/profileFields'
 import RegisterForm from './RegisterForm'
 import TeamPanel from './TeamPanel'
+import PosterPanel from './PosterPanel'
 import {
   eventPhase,
   formatDateRange,
@@ -140,27 +141,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             </div>
           </div>
 
-          {event.poster_url && (
-            <a
-              href={event.poster_url}
-              target="_blank"
-              rel="noreferrer"
-              className="glass group block overflow-hidden p-2 lg:sticky lg:top-6"
-            >
-              {/* 9:16 slot, and object-contain inside it — the whole poster
-                  stays visible because the detail someone came for (prizes,
-                  venue, rules) might sit in any corner of it. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={event.poster_url}
-                alt={`${event.title} poster`}
-                className="aspect-[9/16] w-full rounded-xl object-contain"
-              />
-              <p className="px-2 py-2 text-center text-xs text-[var(--text-faint)] transition-colors group-hover:text-[var(--text-muted)]">
-                Tap to open full size
-              </p>
-            </a>
-          )}
+          {event.poster_url && <PosterPanel src={event.poster_url} title={event.title} />}
         </div>
       </div>
     </>
