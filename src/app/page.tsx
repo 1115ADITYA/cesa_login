@@ -1,226 +1,33 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 
+/**
+ * Google-only, deliberately.
+ *
+ * Email sign-up is "Coming Soon", so an email/password form on the sign-in
+ * side had nothing behind it — nobody could obtain those credentials in the
+ * first place. The emailed-code option was worse than useless: it ran through
+ * generateLink(), which *creates* the auth user on first use, so it quietly
+ * reopened the very sign-up path the Coming Soon panel closes.
+ *
+ * Checked before removing: of 30 auth users, every member who has actually
+ * registered for an event authenticates with Google. The 16 email-provider
+ * rows are test accounts, and the only two that had ever signed in belong to
+ * the maintainer, who also has Google linked.
+ *
+ * The OTP machinery (api/auth/send-otp, verify-otp, otpCrypto, otpRateLimit)
+ * is left in place — it works, and it is what email sign-up will be built on
+ * when "Coming Soon" ships. Only the entry points are gone.
+ */
 export default function AuthPage() {
-  const router = useRouter()
   const supabase = createClient()
 
-  const [view, setView] = useState<'signin' | 'signup' | 'forgot' | 'otp'>('signin')
+  const [view, setView] = useState<'signin' | 'signup'>('signin')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
-
-  // Email-code sign-in. Works for both new and returning accounts — the
-  // send-otp route uses Supabase's generateLink(), which creates the auth
-  // user on first use — so this one flow covers what used to need separate
-  // "sign up" and "forgot password" paths.
-  const [otpStep, setOtpStep] = useState<'request' | 'verify'>('request')
-  const [otpCode, setOtpCode] = useState('')
-  const [otpSession, setOtpSession] = useState<string | null>(null)
-  const [otpCooldown, setOtpCooldown] = useState(0)
-
-  // Form states
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [fullName, setFullName] = useState('')
-  const [username, setUsername] = useState('')
-  
-  // Live username checking. The result is stored tagged with the username it
-  // answers and the status is derived from it, so a slow reply for an earlier
-  // keystroke cannot land after a newer one and mislabel the field.
-  const [usernameCheck, setUsernameCheck] = useState<{ username: string; available: boolean } | null>(null)
-
-  const usernameStatus: 'idle' | 'checking' | 'available' | 'taken' =
-    view !== 'signup' || username.length < 3
-      ? 'idle'
-      : usernameCheck?.username === username
-        ? usernameCheck.available
-          ? 'available'
-          : 'taken'
-        : 'checking'
-
-  useEffect(() => {
-    if (view !== 'signup' || username.length < 3) return
-
-    let live = true
-    // Debounce the check so it doesn't spam the database on every single keystroke
-    const timer = setTimeout(async () => {
-      const { data, error } = await supabase.rpc('check_username_available', {
-        username_to_check: username
-      })
-      if (live && !error) setUsernameCheck({ username, available: data !== false })
-    }, 500)
-
-    return () => {
-      live = false
-      clearTimeout(timer)
-    }
-  }, [username, view, supabase])
-
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-    } else {
-      router.push('/dashboard')
-    }
-  }
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (usernameStatus === 'taken') {
-      setError("Username is already taken.")
-      return
-    }
-
-    setLoading(true)
-    setError(null)
-    setMessage(null)
-
-    // Attempt signup
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-        }
-      }
-    })
-
-    if (error) {
-      if (error.message.includes("already exists") || error.message.includes("already registered")) {
-        setError("An account with this email already exists. Please sign in or use Google.")
-      } else {
-        setError(error.message)
-      }
-      setLoading(false)
-      return
-    }
-
-    if (data.user) {
-      // Because email confirmations are enabled, the user does NOT have a session yet.
-      // This means auth.uid() is null, so standard RLS blocks the insert.
-      // We use a secure Postgres RPC function to handle the insert.
-      const { error: profileError } = await supabase.rpc('create_profile_after_signup', {
-        p_id: data.user.id,
-        p_full_name: fullName,
-        p_username: username,
-        p_email: email
-      })
-      
-      if (profileError) {
-        console.error("Profile creation error:", profileError)
-      }
-
-      setMessage('Check your email for the confirmation link.')
-      setView('signin')
-    }
-    
-    setLoading(false)
-  }
-
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-    setMessage(null)
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/update-password`,
-    })
-
-    if (error) {
-      setError(error.message)
-    } else {
-      setMessage('Password reset link sent to your email.')
-    }
-    setLoading(false)
-  }
-
-  // Countdown for the "resend code" cooldown, mirrored client-side from the
-  // server's 60s window so the button disables immediately rather than
-  // waiting for a rejected request to find out.
-  useEffect(() => {
-    if (otpCooldown <= 0) return
-    const timer = setTimeout(() => setOtpCooldown((s) => s - 1), 1000)
-    return () => clearTimeout(timer)
-  }, [otpCooldown])
-
-  const handleSendOtp = async (e?: React.FormEvent) => {
-    e?.preventDefault()
-    setLoading(true)
-    setError(null)
-    setMessage(null)
-
-    try {
-      const res = await fetch('/api/auth/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Could not send the code.')
-
-      setOtpSession(data.session)
-      setOtpStep('verify')
-      setView('otp')
-      setOtpCooldown(60)
-      setMessage(`Code sent to ${email}.`)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send the code.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!otpSession) return
-    setLoading(true)
-    setError(null)
-
-    try {
-      const res = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp: otpCode, session: otpSession }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Verification failed.')
-
-      // Exchanges the proven code for a real Supabase session. This runs
-      // through the browser client (@supabase/ssr), which writes the session
-      // to cookies rather than localStorage — the same mechanism the
-      // password and Google flows rely on — so middleware and server
-      // components see it immediately, no redirect round trip needed.
-      const { error: sessionError } = await supabase.auth.verifyOtp({
-        token_hash: data.tokenHash,
-        type: 'magiclink',
-      })
-      if (sessionError) throw sessionError
-
-      router.push('/dashboard')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Verification failed.')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleGoogleOAuth = async () => {
     setLoading(true)
@@ -241,33 +48,33 @@ export default function AuthPage() {
   return (
     <div className="flex w-screen h-screen min-h-screen bg-[#130F0E] text-[#F3E9E8] font-sans">
       <div className="hidden lg:flex lg:w-7/12 relative bg-[#130F0E]">
-        <Image 
-          src="/bg-cherry.jpg" 
-          alt="Cherry Blossom Building" 
-          fill 
+        <Image
+          src="/bg-cherry.jpg"
+          alt="Cherry Blossom Building"
+          fill
           className="object-cover opacity-90"
           priority
         />
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#130F0E]/40 to-[#130F0E]"></div>
         <div className="absolute top-10 left-10 z-10">
-          <Image 
-            src="/cesa-logo.png" 
-            alt="CESA logo" 
-            width={140} 
-            height={35} 
-            className="drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)]" 
+          <Image
+            src="/cesa-logo.png"
+            alt="CESA logo"
+            width={140}
+            height={35}
+            className="drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)]"
           />
         </div>
       </div>
 
       <div className="flex-1 flex flex-col justify-center items-center p-8 lg:p-12 relative bg-[#130F0E]">
         <div className="lg:hidden absolute top-8 left-8">
-          <Image 
-            src="/cesa-logo.png" 
-            alt="CESA logo" 
-            width={100} 
-            height={25} 
-            className="drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" 
+          <Image
+            src="/cesa-logo.png"
+            alt="CESA logo"
+            width={100}
+            height={25}
+            className="drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
           />
         </div>
 
@@ -275,223 +82,71 @@ export default function AuthPage() {
           <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 bg-[#1D1716]/80 p-10 rounded-[2rem] backdrop-blur-xl border border-white/5 shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-px bg-gradient-to-r from-transparent via-[#E87A8C]/40 to-transparent"></div>
 
-            {view === 'signin' && (
-              <form onSubmit={handleSignIn} className="flex flex-col gap-4">
-                <div>
-                  <h1 className="font-[family-name:var(--font-space-grotesk)] text-3xl font-bold mb-2 tracking-tight text-[#FDF8F8]">Welcome Back</h1>
-                  <p className="text-[#A68F8C] text-sm">Sign in to your CESA account to continue.</p>
-                </div>
-                
-                {error && <div className="text-sm text-red-400 bg-red-400/10 p-3 rounded-xl border border-red-400/20">{error}</div>}
-                {message && <div className="text-sm text-green-400 bg-green-400/10 p-3 rounded-xl border border-green-400/20">{message}</div>}
+            <div>
+              <h1 className="font-[family-name:var(--font-space-grotesk)] text-3xl font-bold mb-2 tracking-tight text-[#FDF8F8]">
+                {view === 'signin' ? 'Welcome Back' : 'Create Account'}
+              </h1>
+              <p className="text-[#A68F8C] text-sm">
+                {view === 'signin'
+                  ? 'Sign in to your CESA account to continue.'
+                  : 'Join the CESA platform to participate in events.'}
+              </p>
+            </div>
 
-                <div className="flex flex-col gap-4 mt-2">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold text-[#8C7A77] uppercase tracking-wider">Email</label>
-                    <input 
-                      type="email" 
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Enter your email" 
-                      required
-                      className="w-full p-3.5 rounded-xl border border-white/5 bg-black/30 text-[#F3E9E8] text-sm outline-none transition-all focus:border-[#E87A8C] focus:bg-black/50 focus:ring-1 focus:ring-[#E87A8C]/50 placeholder-[#6B5A58]" 
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between items-center">
-                      <label className="text-xs font-bold text-[#8C7A77] uppercase tracking-wider">Password</label>
-                      {/* MADE FORGOT PASSWORD MORE PROMINENT HERE */}
-                      <button type="button" onClick={() => { setView('forgot'); setError(null); setMessage(null) }} className="text-xs text-[#E87A8C] font-bold hover:text-[#F4A5AE] transition-colors underline underline-offset-4">Forgot Password?</button>
-                    </div>
-                    <input 
-                      type="password" 
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Enter your password" 
-                      required
-                      className="w-full p-3.5 rounded-xl border border-white/5 bg-black/30 text-[#F3E9E8] text-sm outline-none transition-all focus:border-[#E87A8C] focus:bg-black/50 focus:ring-1 focus:ring-[#E87A8C]/50 placeholder-[#6B5A58]" 
-                    />
-                  </div>
-                </div>
+            {error && (
+              <div className="text-sm text-red-400 bg-red-400/10 p-3 rounded-xl border border-red-400/20">{error}</div>
+            )}
 
-                <button disabled={loading} type="submit" className="w-full mt-2 bg-gradient-to-r from-[#D16475] via-[#E87A8C] to-[#F4A5AE] text-white font-bold py-3.5 rounded-xl shadow-[0_8px_20px_rgba(232,122,140,0.2)] hover:shadow-[0_8px_25px_rgba(232,122,140,0.35)] transition-all hover:-translate-y-0.5 active:translate-y-0 bg-[length:200%_auto] hover:bg-[position:right_center] disabled:opacity-50 disabled:cursor-not-allowed">
-                  {loading ? 'Signing in...' : 'Sign In'}
-                </button>
+            <button
+              type="button"
+              onClick={handleGoogleOAuth}
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-3 bg-white border border-white/90 text-black font-bold py-4 rounded-xl hover:bg-gray-100 transition-colors shadow-[0_4px_14px_rgba(255,255,255,0.25)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.4)] disabled:opacity-50 disabled:cursor-not-allowed text-base hover:-translate-y-0.5 active:translate-y-0"
+            >
+              <svg width="24" height="24" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.91c1.7-1.57 2.69-3.88 2.69-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.91-2.26c-.81.54-1.85.86-3.05.86-2.34 0-4.32-1.58-5.03-3.71H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.71A5.4 5.4 0 0 1 3.68 9c0-.59.1-1.17.28-1.71V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.04l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.96l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
+              {loading ? 'Redirecting…' : 'Continue with Google'}
+            </button>
 
-                <div className="relative flex items-center py-2">
-                  <div className="flex-grow border-t border-white/5"></div>
-                  <span className="flex-shrink-0 mx-4 text-[#8C7A77] text-xs font-bold uppercase tracking-widest">Or</span>
-                  <div className="flex-grow border-t border-white/5"></div>
-                </div>
+            <div className="relative flex items-center py-2">
+              <div className="flex-grow border-t border-white/5"></div>
+              <span className="flex-shrink-0 mx-4 text-[#8C7A77] text-xs font-bold uppercase tracking-widest">Or</span>
+              <div className="flex-grow border-t border-white/5"></div>
+            </div>
 
-                <button type="button" onClick={handleGoogleOAuth} disabled={loading} className="w-full flex items-center justify-center gap-3 bg-white/5 border border-white/10 text-[#D1C2C0] font-semibold py-3.5 rounded-xl hover:bg-white/10 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                  <svg width="20" height="20" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.91c1.7-1.57 2.69-3.88 2.69-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.91-2.26c-.81.54-1.85.86-3.05.86-2.34 0-4.32-1.58-5.03-3.71H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.71A5.4 5.4 0 0 1 3.68 9c0-.59.1-1.17.28-1.71V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.04l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.96l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
-                  Continue with Google
-                </button>
+            <div className="flex flex-col items-center justify-center p-6 border border-dashed border-white/10 rounded-2xl bg-black/20">
+              <span className="text-[#8C7A77] text-sm font-semibold mb-1">
+                {view === 'signin' ? 'Email Sign In' : 'Email Registration'}
+              </span>
+              <span className="bg-gradient-to-r from-[#D16475] to-[#E87A8C] text-transparent bg-clip-text text-lg font-bold">
+                Coming Soon
+              </span>
+            </div>
 
-                <button
-                  type="button"
-                  onClick={() => { setView('otp'); setOtpStep('request'); setOtpCode(''); setOtpSession(null); setError(null); setMessage(null) }}
-                  className="w-full flex items-center justify-center gap-2 text-[#A68F8C] font-semibold py-2 rounded-xl hover:text-[#F3E9E8] transition-colors text-sm"
-                >
-                  Or sign in with an emailed code
-                </button>
-
-                <p className="text-center text-sm text-[#A68F8C] mt-2">
+            <p className="text-center text-sm text-[#A68F8C] mt-2">
+              {view === 'signin' ? (
+                <>
                   Don&apos;t have an account?{' '}
-                  <button type="button" onClick={() => { setView('signup'); setError(null); setMessage(null) }} className="text-[#E87A8C] font-bold hover:underline underline-offset-4">Sign Up</button>
-                </p>
-              </form>
-            )}
-
-            {view === 'signup' && (
-              <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                <div>
-                  <h1 className="font-[family-name:var(--font-space-grotesk)] text-3xl font-bold mb-2 tracking-tight text-[#FDF8F8]">Create Account</h1>
-                  <p className="text-[#A68F8C] text-sm">Join the CESA platform to participate in events.</p>
-                </div>
-                
-                {error && <div className="text-sm text-red-400 bg-red-400/10 p-3 rounded-xl border border-red-400/20">{error}</div>}
-
-                <div className="py-4">
-                  <button type="button" onClick={handleGoogleOAuth} disabled={loading} className="w-full flex items-center justify-center gap-3 bg-white border border-white/90 text-black font-bold py-4 rounded-xl hover:bg-gray-100 transition-colors shadow-[0_4px_14px_rgba(255,255,255,0.25)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.4)] disabled:opacity-50 disabled:cursor-not-allowed text-base hover:-translate-y-0.5 active:translate-y-0">
-                    <svg width="24" height="24" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.91c1.7-1.57 2.69-3.88 2.69-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.91-2.26c-.81.54-1.85.86-3.05.86-2.34 0-4.32-1.58-5.03-3.71H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.71A5.4 5.4 0 0 1 3.68 9c0-.59.1-1.17.28-1.71V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.04l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.96l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
-                    Continue with Google
+                  <button
+                    type="button"
+                    onClick={() => { setView('signup'); setError(null) }}
+                    className="text-[#E87A8C] font-bold hover:underline underline-offset-4"
+                  >
+                    Sign Up
                   </button>
-                </div>
-
-                <div className="relative flex items-center py-2">
-                  <div className="flex-grow border-t border-white/5"></div>
-                  <span className="flex-shrink-0 mx-4 text-[#8C7A77] text-xs font-bold uppercase tracking-widest">Or</span>
-                  <div className="flex-grow border-t border-white/5"></div>
-                </div>
-
-                <div className="flex flex-col items-center justify-center p-6 border border-dashed border-white/10 rounded-2xl bg-black/20">
-                  <span className="text-[#8C7A77] text-sm font-semibold mb-1">Email Registration</span>
-                  <span className="bg-gradient-to-r from-[#D16475] to-[#E87A8C] text-transparent bg-clip-text text-lg font-bold">Coming Soon</span>
-                </div>
-
-                <p className="text-center text-sm text-[#A68F8C] mt-2">
+                </>
+              ) : (
+                <>
                   Already have an account?{' '}
-                  <button type="button" onClick={() => { setView('signin'); setError(null); setMessage(null) }} className="text-[#E87A8C] font-bold hover:underline underline-offset-4">Sign In</button>
-                </p>
-              </div>
-            )}
-
-            {view === 'forgot' && (
-              <form onSubmit={handleForgotPassword} className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                <div>
-                  <h1 className="font-[family-name:var(--font-space-grotesk)] text-3xl font-bold mb-2 tracking-tight text-[#FDF8F8]">Reset Password</h1>
-                  <p className="text-[#A68F8C] text-sm">Enter your email and we&apos;ll send you a link to reset your password.</p>
-                </div>
-                
-                {error && <div className="text-sm text-red-400 bg-red-400/10 p-3 rounded-xl border border-red-400/20">{error}</div>}
-                {message && <div className="text-sm text-green-400 bg-green-400/10 p-3 rounded-xl border border-green-400/20">{message}</div>}
-
-                <div className="flex flex-col gap-4 mt-2">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold text-[#8C7A77] uppercase tracking-wider">Email</label>
-                    <input 
-                      type="email" 
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Enter your email" 
-                      required
-                      className="w-full p-3.5 rounded-xl border border-white/5 bg-black/30 text-[#F3E9E8] text-sm outline-none transition-all focus:border-[#E87A8C] focus:bg-black/50 focus:ring-1 focus:ring-[#E87A8C]/50 placeholder-[#6B5A58]" 
-                    />
-                  </div>
-                </div>
-
-                <button disabled={loading} type="submit" className="w-full mt-2 bg-gradient-to-r from-[#D16475] via-[#E87A8C] to-[#F4A5AE] text-white font-bold py-3.5 rounded-xl shadow-[0_8px_20px_rgba(232,122,140,0.2)] hover:shadow-[0_8px_25px_rgba(232,122,140,0.35)] transition-all hover:-translate-y-0.5 active:translate-y-0 bg-[length:200%_auto] hover:bg-[position:right_center] disabled:opacity-50 disabled:cursor-not-allowed">
-                  {loading ? 'Sending link...' : 'Send Reset Link'}
-                </button>
-
-                <p className="text-center text-sm text-[#A68F8C] mt-4">
-                  Remember your password?{' '}
-                  <button type="button" onClick={() => { setView('signin'); setError(null); setMessage(null) }} className="text-[#E87A8C] font-bold hover:underline underline-offset-4">Sign In</button>
-                </p>
-              </form>
-            )}
-
-            {view === 'otp' && otpStep === 'request' && (
-              <form onSubmit={handleSendOtp} className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                <div>
-                  <h1 className="font-[family-name:var(--font-space-grotesk)] text-3xl font-bold mb-2 tracking-tight text-[#FDF8F8]">Sign in with a code</h1>
-                  <p className="text-[#A68F8C] text-sm">
-                    We&apos;ll email you a 6-digit code — works whether or not you already have an account.
-                  </p>
-                </div>
-
-                {error && <div className="text-sm text-red-400 bg-red-400/10 p-3 rounded-xl border border-red-400/20">{error}</div>}
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-[#8C7A77] uppercase tracking-wider">Email</label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your email"
-                    required
-                    className="w-full p-3.5 rounded-xl border border-white/5 bg-black/30 text-[#F3E9E8] text-sm outline-none transition-all focus:border-[#E87A8C] focus:bg-black/50 focus:ring-1 focus:ring-[#E87A8C]/50 placeholder-[#6B5A58]"
-                  />
-                </div>
-
-                <button disabled={loading} type="submit" className="w-full mt-2 bg-gradient-to-r from-[#D16475] via-[#E87A8C] to-[#F4A5AE] text-white font-bold py-3.5 rounded-xl shadow-[0_8px_20px_rgba(232,122,140,0.2)] hover:shadow-[0_8px_25px_rgba(232,122,140,0.35)] transition-all hover:-translate-y-0.5 active:translate-y-0 bg-[length:200%_auto] hover:bg-[position:right_center] disabled:opacity-50 disabled:cursor-not-allowed">
-                  {loading ? 'Sending code...' : 'Send code'}
-                </button>
-
-                <p className="text-center text-sm text-[#A68F8C] mt-2">
-                  <button type="button" onClick={() => { setView('signin'); setError(null); setMessage(null) }} className="text-[#E87A8C] font-bold hover:underline underline-offset-4">← Back</button>
-                </p>
-              </form>
-            )}
-
-            {view === 'otp' && otpStep === 'verify' && (
-              <form onSubmit={handleVerifyOtp} className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                <div>
-                  <h1 className="font-[family-name:var(--font-space-grotesk)] text-3xl font-bold mb-2 tracking-tight text-[#FDF8F8]">Enter your code</h1>
-                  <p className="text-[#A68F8C] text-sm">Sent to {email}. It expires in 10 minutes.</p>
-                </div>
-
-                {error && <div className="text-sm text-red-400 bg-red-400/10 p-3 rounded-xl border border-red-400/20">{error}</div>}
-                {message && <div className="text-sm text-green-400 bg-green-400/10 p-3 rounded-xl border border-green-400/20">{message}</div>}
-
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  required
-                  autoFocus
-                  placeholder="000000"
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                  className="w-full p-3.5 rounded-xl border border-white/5 bg-black/30 text-[#F3E9E8] text-center text-2xl font-mono tracking-[0.5em] outline-none transition-all focus:border-[#E87A8C] focus:bg-black/50 focus:ring-1 focus:ring-[#E87A8C]/50"
-                />
-
-                <button disabled={loading || otpCode.length !== 6} type="submit" className="w-full bg-gradient-to-r from-[#D16475] via-[#E87A8C] to-[#F4A5AE] text-white font-bold py-3.5 rounded-xl shadow-[0_8px_20px_rgba(232,122,140,0.2)] hover:shadow-[0_8px_25px_rgba(232,122,140,0.35)] transition-all hover:-translate-y-0.5 active:translate-y-0 bg-[length:200%_auto] hover:bg-[position:right_center] disabled:opacity-50 disabled:cursor-not-allowed">
-                  {loading ? 'Verifying...' : 'Verify & sign in'}
-                </button>
-
-                <div className="flex items-center justify-between text-sm">
                   <button
                     type="button"
-                    onClick={() => { setOtpStep('request'); setOtpCode(''); setError(null); setMessage(null) }}
-                    className="text-[#A68F8C] hover:text-[#F3E9E8] transition-colors"
+                    onClick={() => { setView('signin'); setError(null) }}
+                    className="text-[#E87A8C] font-bold hover:underline underline-offset-4"
                   >
-                    Change email
+                    Sign In
                   </button>
-                  <button
-                    type="button"
-                    disabled={otpCooldown > 0 || loading}
-                    onClick={() => handleSendOtp()}
-                    className="text-[#E87A8C] font-bold hover:underline underline-offset-4 disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed"
-                  >
-                    {otpCooldown > 0 ? `Resend in ${otpCooldown}s` : 'Resend code'}
-                  </button>
-                </div>
-              </form>
-            )}
-
+                </>
+              )}
+            </p>
           </div>
         </div>
       </div>
