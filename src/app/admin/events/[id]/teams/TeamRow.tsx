@@ -45,6 +45,7 @@ export default function TeamRow({
   const [newUsername, setNewUsername] = useState('')
   const [suggestions, setSuggestions] = useState<{ query: string; results: Suggestion[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null)
   const [pending, startTransition] = useTransition()
 
   const accepted = team.members.filter((m) => m.status === 'accepted').length
@@ -177,12 +178,15 @@ export default function TeamRow({
             </span>
 
             <div className="min-w-0 flex-1">
-              <p className="flex flex-wrap items-center gap-2 truncate text-sm font-semibold text-white">
+              <button 
+                onClick={() => setSelectedMember(m)}
+                className="flex flex-wrap items-center gap-2 truncate text-sm font-semibold text-white hover:underline text-left"
+              >
                 @{m.username}
                 {m.isLeader && (
                   <span className="pill bg-[var(--warning)]/12 text-[var(--warning)]">Leader</span>
                 )}
-              </p>
+              </button>
               {m.fullName && <p className="truncate text-xs text-[var(--text-faint)]">{m.fullName}</p>}
               {/* The details members enter once on their profile — here so an
                   organiser has the roster and contact list in one place. */}
@@ -222,6 +226,14 @@ export default function TeamRow({
                 make leader
               </button>
             )}
+
+            <button
+              className="shrink-0 text-xs font-semibold text-[var(--text-faint)] transition-colors hover:text-white disabled:opacity-50"
+              disabled={pending}
+              onClick={() => setSelectedMember(m)}
+            >
+              view details
+            </button>
 
             <button
               className="shrink-0 text-xs font-semibold text-[var(--text-faint)] transition-colors hover:text-[var(--danger)] disabled:opacity-50"
@@ -294,6 +306,71 @@ export default function TeamRow({
           <p className="mt-2 text-xs text-[var(--text-faint)]">No account matches “{q}”.</p>
         )}
       </div>
+
+      {selectedMember && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" 
+          onClick={() => setSelectedMember(null)}
+        >
+          <div className="glass w-full max-w-md p-6 relative border border-[var(--border-strong)] shadow-2xl" onClick={e => e.stopPropagation()}>
+            <button 
+              className="absolute top-4 right-4 text-[var(--text-faint)] hover:text-white transition-colors" 
+              onClick={() => setSelectedMember(null)}
+            >
+              ✕
+            </button>
+            <h3 className="text-xl font-bold text-white mb-6">Member Details</h3>
+            <div className="space-y-4">
+              <div>
+                <span className="block text-[0.65rem] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1">Username</span>
+                <span className="text-white text-sm font-medium">@{selectedMember.username}</span>
+              </div>
+              {selectedMember.fullName && (
+                <div>
+                  <span className="block text-[0.65rem] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1">Full Name</span>
+                  <span className="text-white text-sm font-medium">{selectedMember.fullName}</span>
+                </div>
+              )}
+              {selectedMember.department && (
+                <div>
+                  <span className="block text-[0.65rem] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1">Department</span>
+                  <span className="text-white text-sm font-medium">{selectedMember.department}</span>
+                </div>
+              )}
+              {selectedMember.yearOfStudy && (
+                <div>
+                  <span className="block text-[0.65rem] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1">Year of Study</span>
+                  <span className="text-white text-sm font-medium">{selectedMember.yearOfStudy}</span>
+                </div>
+              )}
+              {selectedMember.division && (
+                <div>
+                  <span className="block text-[0.65rem] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1">Division</span>
+                  <span className="text-white text-sm font-medium">{selectedMember.division}</span>
+                </div>
+              )}
+              {selectedMember.rollNo && (
+                <div>
+                  <span className="block text-[0.65rem] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1">Roll No</span>
+                  <span className="text-white text-sm font-medium">{selectedMember.rollNo}</span>
+                </div>
+              )}
+              {selectedMember.contact && (
+                <div>
+                  <span className="block text-[0.65rem] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1">Contact</span>
+                  <span className="text-white text-sm font-medium">{selectedMember.contact}</span>
+                </div>
+              )}
+            </div>
+            
+            <div className="mt-8 flex justify-end">
+              <button className="btn btn-ghost" onClick={() => setSelectedMember(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
