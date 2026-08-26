@@ -97,7 +97,6 @@ export default function EventForm({
         variant="banner"
         defaultUrl={defaults?.bannerUrl}
         positionName="bannerPosition"
-        defaultPosition={defaults?.bannerPosition}
       />
 
       <ImageUpload
