@@ -34,12 +34,24 @@ Works for both new and returning accounts: Supabase's `admin.generateLink()`
 creates the Auth user on first use for type `magiclink`, so there is no
 separate signup step.
 
-Sends through Gmail SMTP via `nodemailer` rather than Supabase's built-in
-mailer — hosted mail services calling Google's SMTP from cloud IPs get hit
-with `535 BadCredentials` fairly often, and a personal Gmail account with an
-[app password](https://myaccount.google.com/apppasswords) sidesteps that
-entirely, for free. Set `GMAIL_USER` and `GMAIL_APP_PASSWORD`; use a real app
-password, never the account's login password.
+**Production sends through Brevo's HTTP API; Gmail SMTP is local-only.**
+
+The original design used Gmail SMTP everywhere, on the reasoning that sending
+from "your own server" avoids the `535 BadCredentials` that Google returns to
+hosted mail services calling it from cloud IPs. That reasoning does not survive
+serverless: Vercel *is* a data centre, and Google refuses `AUTH PLAIN` from it
+with exactly that error even when the app password is valid — verified, the
+same credentials send fine from a laptop and are rejected from Vercel. An HTTP
+API is not SMTP auth, so it is not subject to the block.
+
+Set `BREVO_API_KEY` and `EMAIL_FROM_ADDRESS` for production. The free tier is
+300 emails/day and needs no domain — verify a single sender address (an
+ordinary Gmail address works) under Senders & IPs in the Brevo dashboard and
+use that as `EMAIL_FROM_ADDRESS`.
+
+`GMAIL_USER` / `GMAIL_APP_PASSWORD` still work for local development, where
+requests originate from a residential IP Google accepts. Whichever pair is
+configured wins, Brevo first.
 
 The 6-digit code and the Supabase `token_hash` it corresponds to round-trip
 through the browser as an AES-256-GCM–encrypted payload rather than a database
@@ -49,15 +61,14 @@ deploying (it falls back to `SUPABASE_SERVICE_ROLE_KEY` only so local setup
 does not hard-fail without it).
 
 Two Gmail-specific limits worth knowing:
-- **500 emails / 24 hours** on a personal account (2000/day on Workspace).
-  `0005_otp_rate_limit.sql` enforces a 60s-per-email cooldown, 5/email/hour,
+- **300 emails/day on Brevo's free tier** (500/day if you fall back to Gmail
+  locally). `0005_otp_rate_limit.sql` enforces a 60s-per-email cooldown, 5/email/hour,
   and 15/IP/hour in Postgres — atomic and durable across serverless
   instances, unlike an in-process rate limiter, which a cold start or a
   concurrent invocation would silently bypass.
-- Sending from serverless infrastructure still carries some of the same
-  cloud-IP suspicion the Supabase-mailer problem was about, just usually less
-  aggressively enforced against plain SMTP auth. The rate limits above are a
-  real mitigation, not a guarantee.
+- Those limits protect the sending account from being flagged for volume.
+  They do not help with IP-based SMTP refusal, which is why production is on
+  an HTTP API rather than SMTP at all.
 
 ## The registration flow
 
