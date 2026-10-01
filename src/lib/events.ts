@@ -42,19 +42,38 @@ export type EventRow = {
   banner_url: string | null
   banner_position: string | null
   poster_url: string | null
-  starts_at: string
-  ends_at: string
+  /** Both null while the date is still to be announced — see date_label. */
+  starts_at: string | null
+  ends_at: string | null
+  /** Shown in place of the dates while they are null. */
+  date_label: string | null
   registration_closes_at: string | null
   min_team_size: number
   max_team_size: number | null
+  /** Outside registration page behind the Join Now button. */
+  join_url: string | null
+  show_join_button: boolean
 }
 
-/** Registration deadline, falling back to the start of the event. */
+export const DEFAULT_DATE_LABEL = 'Coming Soon'
+
+/**
+ * Registration deadline, falling back to the start of the event. Null when
+ * neither is set — a Coming Soon event with no deadline stays open, matching
+ * registration_is_open() in 0011.
+ */
 export function registrationDeadline(event: Pick<EventRow, 'registration_closes_at' | 'starts_at'>) {
-  return new Date(event.registration_closes_at ?? event.starts_at)
+  const at = event.registration_closes_at ?? event.starts_at
+  return at ? new Date(at) : null
+}
+
+export function registrationIsOpen(event: Pick<EventRow, 'registration_closes_at' | 'starts_at'>, now: number) {
+  const deadline = registrationDeadline(event)
+  return deadline === null || deadline.getTime() > now
 }
 
 export function eventPhase(event: Pick<EventRow, 'starts_at' | 'ends_at'>, now: number) {
+  if (!event.starts_at || !event.ends_at) return 'upcoming' as const
   const start = new Date(event.starts_at).getTime()
   const end = new Date(event.ends_at).getTime()
   if (now < start) return 'upcoming' as const
@@ -69,6 +88,17 @@ export function eventPhase(event: Pick<EventRow, 'starts_at' | 'ends_at'>, now: 
 export function teamState(reg: Pick<MyRegistration, 'my_status' | 'accepted_count' | 'min_team_size'>) {
   if (reg.my_status === 'invited') return 'invited' as const
   return reg.accepted_count >= reg.min_team_size ? ('confirmed' as const) : ('forming' as const)
+}
+
+/** The "when" line for any event: its date range, or the Coming Soon text. */
+export function eventWhen(event: Pick<EventRow, 'starts_at' | 'ends_at' | 'date_label'>) {
+  if (!event.starts_at || !event.ends_at) return event.date_label?.trim() || DEFAULT_DATE_LABEL
+  return formatDateRange(event.starts_at, event.ends_at)
+}
+
+/** The Join Now link, only when the admin has switched the button on. */
+export function joinLink(event: Pick<EventRow, 'join_url' | 'show_join_button'>) {
+  return event.show_join_button && event.join_url ? event.join_url : null
 }
 
 export function formatDateRange(startsAt: string, endsAt: string) {
@@ -93,7 +123,8 @@ export function formatDateRange(startsAt: string, endsAt: string) {
 }
 
 /** "in 3 days" / "in 4 hours" / "closed" — for the registration deadline. */
-export function timeUntil(target: Date, now: number) {
+export function timeUntil(target: Date | null, now: number) {
+  if (!target) return null
   const ms = target.getTime() - now
   if (ms <= 0) return null
 

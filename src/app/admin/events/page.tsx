@@ -5,7 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { AdminHeader } from '../AdminShell'
 import { deleteEvent } from '../actions'
 import DeleteEventButton from './DeleteEventButton'
-import { formatDateRange, teamSizeLabel, type EventRow } from '@/lib/events'
+import { eventWhen, joinLink, teamSizeLabel, type EventRow } from '@/lib/events'
 
 export const metadata = { title: 'Events — Admin', robots: { index: false } }
 export const dynamic = 'force-dynamic'
@@ -66,7 +66,7 @@ export default async function AdminEventsPage() {
             const ids = teamsByEvent.get(e.id) ?? []
             const confirmed = ids.filter((id) => (acceptedByTeam.get(id) ?? 0) >= e.min_team_size).length
             const status = eventStatus(e.starts_at, e.ends_at, now)
-            const start = new Date(e.starts_at)
+            const start = e.starts_at ? new Date(e.starts_at) : null
 
             return (
               <div key={e.id} className="glass card-hover flex flex-col overflow-hidden">
@@ -80,10 +80,18 @@ export default async function AdminEventsPage() {
                   />
                 ) : (
                   <div className="flex h-32 w-full flex-col items-center justify-center bg-gradient-to-b from-[var(--accent-deep)]/18 to-[var(--accent)]/6">
-                    <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[var(--accent-light)]">
-                      {start.toLocaleDateString(undefined, { month: 'short' })}
-                    </span>
-                    <span className="heading text-3xl leading-none">{start.getDate()}</span>
+                    {start ? (
+                      <>
+                        <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[var(--accent-light)]">
+                          {start.toLocaleDateString(undefined, { month: 'short' })}
+                        </span>
+                        <span className="heading text-3xl leading-none">{start.getDate()}</span>
+                      </>
+                    ) : (
+                      <span className="text-xs font-bold uppercase tracking-widest text-[var(--accent-light)]">
+                        {eventWhen(e)}
+                      </span>
+                    )}
                   </div>
                 )}
 
@@ -93,9 +101,17 @@ export default async function AdminEventsPage() {
                     <span className={`pill shrink-0 ${status.tone}`}>{status.label}</span>
                   </div>
                   <p className="mt-1.5 text-sm text-[var(--text-muted)]">
-                    {formatDateRange(e.starts_at, e.ends_at)}
+                    {eventWhen(e)}
                     {e.location ? ` · ${e.location}` : ''} · {teamSizeLabel(e.min_team_size, e.max_team_size)}
                   </p>
+                  {joinLink(e) && (
+                    <p className="mt-2 truncate text-xs text-[var(--text-faint)]">
+                      Join Now →{' '}
+                      <a href={joinLink(e)!} target="_blank" rel="noreferrer" className="text-[var(--accent-light)] hover:underline">
+                        {joinLink(e)}
+                      </a>
+                    </p>
+                  )}
                   <p className="mt-2 text-xs text-[var(--text-faint)]">
                     <span className="font-bold text-[var(--text)]">{ids.length}</span> registered ·{' '}
                     <span className="font-bold text-[var(--success)]">{confirmed}</span> confirmed
@@ -123,7 +139,8 @@ export default async function AdminEventsPage() {
   )
 }
 
-function eventStatus(startsAt: string, endsAt: string, now: number) {
+function eventStatus(startsAt: string | null, endsAt: string | null, now: number) {
+  if (!startsAt || !endsAt) return { label: 'Coming soon', tone: 'bg-[var(--info)]/12 text-[var(--info)]' }
   const start = new Date(startsAt).getTime()
   const end = new Date(endsAt).getTime()
   if (now < start) return { label: 'Upcoming', tone: 'bg-[var(--info)]/12 text-[var(--info)]' }

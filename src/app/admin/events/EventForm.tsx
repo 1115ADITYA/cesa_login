@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import ImageUpload from './ImageUpload'
 
 type EventDefaults = {
@@ -12,7 +12,11 @@ type EventDefaults = {
   posterUrl?: string
   startsAt?: string
   endsAt?: string
+  /** Set (even to '') when the event is saved as Coming Soon. */
+  dateLabel?: string | null
   registrationClosesAt?: string
+  joinUrl?: string
+  showJoinButton?: boolean
   minTeamSize?: number | null
   maxTeamSize?: number | null
 }
@@ -35,6 +39,9 @@ export default function EventForm({
   submitLabel: string
 }) {
   const [state, formAction, pending] = useActionState(action, null)
+  // An existing event with no start date was saved as Coming Soon.
+  const [comingSoon, setComingSoon] = useState(Boolean(defaults && !defaults.startsAt))
+  const [showJoin, setShowJoin] = useState(defaults?.showJoinButton ?? false)
 
   return (
     <form action={formAction} className="glass flex max-w-xl flex-col gap-4 p-6">
@@ -50,16 +57,36 @@ export default function EventForm({
         <textarea name="description" rows={4} defaultValue={defaults?.description} className={inputClass} />
       </Field>
 
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Starts">
-          <input type="datetime-local" name="startsAt" required defaultValue={toLocalInput(defaults?.startsAt)} className={inputClass} />
-        </Field>
-        <Field label="Ends">
-          <input type="datetime-local" name="endsAt" required defaultValue={toLocalInput(defaults?.endsAt)} className={inputClass} />
-        </Field>
-      </div>
+      <fieldset className="flex flex-col gap-3">
+        <legend className="label mb-1.5">Date</legend>
+        <div className="flex flex-wrap gap-2">
+          <ScheduleOption checked={!comingSoon} onSelect={() => setComingSoon(false)} value="fixed" label="Fixed dates" />
+          <ScheduleOption checked={comingSoon} onSelect={() => setComingSoon(true)} value="comingSoon" label="Coming soon" />
+        </div>
 
-      <Field label="Registration closes (blank = when the event starts)">
+        {comingSoon ? (
+          <Field label="Show this instead of a date">
+            <input
+              name="dateLabel"
+              maxLength={80}
+              defaultValue={defaults?.dateLabel || 'Coming Soon'}
+              placeholder="Coming Soon"
+              className={inputClass}
+            />
+          </Field>
+        ) : (
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Starts">
+              <input type="datetime-local" name="startsAt" required defaultValue={toLocalInput(defaults?.startsAt)} className={inputClass} />
+            </Field>
+            <Field label="Ends">
+              <input type="datetime-local" name="endsAt" required defaultValue={toLocalInput(defaults?.endsAt)} className={inputClass} />
+            </Field>
+          </div>
+        )}
+      </fieldset>
+
+      <Field label={comingSoon ? 'Registration closes (blank = stays open)' : 'Registration closes (blank = when the event starts)'}>
         <input
           type="datetime-local"
           name="registrationClosesAt"
@@ -91,6 +118,36 @@ export default function EventForm({
         <input name="location" defaultValue={defaults?.location} className={inputClass} />
       </Field>
 
+      <div className="flex flex-col gap-3">
+        <label className="flex items-center gap-2.5 text-sm font-semibold text-[var(--text)]">
+          <input
+            type="checkbox"
+            name="showJoinButton"
+            checked={showJoin}
+            onChange={(e) => setShowJoin(e.target.checked)}
+            className="h-4 w-4 accent-[var(--accent)]"
+          />
+          Show a Join Now button
+        </label>
+        {/* Kept in the form while hidden, so switching the button off does not
+            throw the link away. */}
+        <div className={showJoin ? '' : 'hidden'}>
+          <Field label="Join Now link">
+            <input
+              type="url"
+              name="joinUrl"
+              required={showJoin}
+              defaultValue={defaults?.joinUrl}
+              placeholder="https://unstop.com/…"
+              className={inputClass}
+            />
+          </Field>
+          <p className="mt-1.5 text-xs text-[var(--text-faint)]">
+            Replaces the built-in registration form — members are sent to this link instead. Opens in a new tab.
+          </p>
+        </div>
+      </div>
+
       <ImageUpload
         name="bannerUrl"
         label="Banner image (optional)"
@@ -119,6 +176,25 @@ export default function EventForm({
 }
 
 const inputClass = 'field'
+
+function ScheduleOption({
+  checked,
+  onSelect,
+  value,
+  label,
+}: {
+  checked: boolean
+  onSelect: () => void
+  value: string
+  label: string
+}) {
+  return (
+    <label className={`btn !px-4 !py-2 !text-sm ${checked ? 'btn-primary' : 'btn-ghost'}`}>
+      <input type="radio" name="schedule" value={value} checked={checked} onChange={onSelect} className="sr-only" />
+      {label}
+    </label>
+  )
+}
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

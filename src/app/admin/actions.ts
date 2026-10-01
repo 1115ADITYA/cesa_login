@@ -53,17 +53,34 @@ type EventFields = {
   banner_url: string | null
   banner_position: string
   poster_url: string | null
-  starts_at: string
-  ends_at: string
+  starts_at: string | null
+  ends_at: string | null
+  date_label: string | null
   registration_closes_at: string | null
   min_team_size: number
   max_team_size: number | null
+  join_url: string | null
+  show_join_button: boolean
 }
 
 /** Only "N% N%" is ever written by BannerUpload.tsx — anything else is either absent or tampered with. */
 function toBannerPosition(raw: FormDataEntryValue | null): string {
   const value = String(raw || '').trim()
   return /^\d{1,3}% \d{1,3}%$/.test(value) ? value : '50% 50%'
+}
+
+/**
+ * Only http(s) links — the button is an <a href>, and a pasted `javascript:`
+ * URL would run in every member's session. A bare "unstop.com/…" gets https://.
+ */
+function toHttpUrl(raw: string): string | null {
+  const withScheme = /^[a-z][a-z\d+.-]*:/i.test(raw) ? raw : `https://${raw}`
+  try {
+    const url = new URL(withScheme)
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : null
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -75,17 +92,32 @@ function toEventFields(formData: FormData): { error: string } | { fields: EventF
   const title = String(formData.get('title') || '').trim()
   if (!title) return { error: 'Title is required.' }
 
-  const startsAt = new Date(String(formData.get('startsAt')))
-  const endsAt = new Date(String(formData.get('endsAt')))
-  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
-    return { error: 'Start and end times are required.' }
+  // "Coming soon" drops the dates entirely and shows the admin's text instead.
+  const comingSoon = formData.get('schedule') === 'comingSoon'
+  let startsAt: Date | null = null
+  let endsAt: Date | null = null
+  let dateLabel: string | null = null
+  if (comingSoon) {
+    dateLabel = String(formData.get('dateLabel') || '').trim().slice(0, 80) || null
+  } else {
+    startsAt = new Date(String(formData.get('startsAt')))
+    endsAt = new Date(String(formData.get('endsAt')))
+    if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+      return { error: 'Start and end times are required — or choose "Coming soon".' }
+    }
+    if (endsAt < startsAt) return { error: 'The event cannot end before it starts.' }
   }
-  if (endsAt < startsAt) return { error: 'The event cannot end before it starts.' }
 
   const closesRaw = String(formData.get('registrationClosesAt') || '').trim()
   const closesAt = closesRaw ? new Date(closesRaw) : null
   if (closesAt && Number.isNaN(closesAt.getTime())) return { error: 'Registration close time is not a valid date.' }
-  if (closesAt && closesAt > endsAt) return { error: 'Registration cannot close after the event has ended.' }
+  if (closesAt && endsAt && closesAt > endsAt) return { error: 'Registration cannot close after the event has ended.' }
+
+  const showJoinButton = formData.get('showJoinButton') === 'on'
+  const joinRaw = String(formData.get('joinUrl') || '').trim()
+  const joinUrl = joinRaw ? toHttpUrl(joinRaw) : null
+  if (joinRaw && !joinUrl) return { error: 'The Join Now link must be a full web address, like https://unstop.com/…' }
+  if (showJoinButton && !joinUrl) return { error: 'Paste the link the Join Now button should open.' }
 
   const minRaw = String(formData.get('minTeamSize') || '').trim()
   const maxRaw = String(formData.get('maxTeamSize') || '').trim()
@@ -108,11 +140,14 @@ function toEventFields(formData: FormData): { error: string } | { fields: EventF
       banner_url: String(formData.get('bannerUrl') || '').trim() || null,
       banner_position: toBannerPosition(formData.get('bannerPosition')),
       poster_url: String(formData.get('posterUrl') || '').trim() || null,
-      starts_at: startsAt.toISOString(),
-      ends_at: endsAt.toISOString(),
+      starts_at: startsAt ? startsAt.toISOString() : null,
+      ends_at: endsAt ? endsAt.toISOString() : null,
+      date_label: dateLabel,
       registration_closes_at: closesAt ? closesAt.toISOString() : null,
       min_team_size: minTeamSize,
       max_team_size: maxTeamSize,
+      join_url: joinUrl,
+      show_join_button: showJoinButton,
     },
   }
 }

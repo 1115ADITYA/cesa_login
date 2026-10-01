@@ -1,7 +1,9 @@
 import Link from 'next/link'
+import JoinNowButton from '@/components/JoinNowButton'
 import {
   eventPhase,
-  formatDateRange,
+  eventWhen,
+  joinLink,
   registrationDeadline,
   teamSizeLabel,
   teamState,
@@ -26,27 +28,38 @@ export default function EventRow({
   const phase = eventPhase(event, now)
   const deadline = registrationDeadline(event)
   const closesIn = timeUntil(deadline, now)
-  const start = new Date(event.starts_at)
+  const start = event.starts_at ? new Date(event.starts_at) : null
+  const join = phase !== 'past' ? joinLink(event) : null
 
   return (
-    <Link
-      href={`/events/${event.id}`}
-      className="group flex items-stretch gap-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-sunken)] p-3.5 transition-all hover:border-[var(--accent)]/35 hover:bg-black/40 sm:gap-5 sm:p-4"
+    // Stretched link, not a wrapping <Link> — see EventCard.
+    <div
+      className="group relative flex items-stretch gap-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-sunken)] p-3.5 transition-all hover:border-[var(--accent)]/35 hover:bg-black/40 sm:gap-5 sm:p-4"
     >
       {/* Always the date, never the banner. Rows are the dense, scannable
           view — grouped by phase, read top to bottom — and a date is what
           someone is actually scanning for there. The artwork gets its space
           on the cards and the event page instead. */}
       <div className="flex w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-gradient-to-b from-[#D16475]/18 to-[#E87A8C]/6 py-3 sm:w-[4.5rem]">
-        <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[var(--accent-light)]">
-          {start.toLocaleDateString(undefined, { month: 'short' })}
-        </span>
-        <span className="heading text-2xl leading-none">{start.getDate()}</span>
+        {start ? (
+          <>
+            <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[var(--accent-light)]">
+              {start.toLocaleDateString(undefined, { month: 'short' })}
+            </span>
+            <span className="heading text-2xl leading-none">{start.getDate()}</span>
+          </>
+        ) : (
+          <span className="heading text-lg leading-none">TBA</span>
+        )}
       </div>
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="truncate font-bold text-white group-hover:text-[var(--accent-light)]">{event.title}</h3>
+          <h3 className="truncate font-bold text-white group-hover:text-[var(--accent-light)]">
+            <Link href={`/events/${event.id}`} className="before:absolute before:inset-0">
+              {event.title}
+            </Link>
+          </h3>
           <Badge phase={phase} registration={registration} />
         </div>
 
@@ -55,10 +68,12 @@ export default function EventRow({
         )}
 
         <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-[var(--text-faint)]">
-          <span>{formatDateRange(event.starts_at, event.ends_at)}</span>
+          <span>{eventWhen(event)}</span>
           {event.location && <span>· {event.location}</span>}
           <span>· {teamSizeLabel(event.min_team_size, event.max_team_size)}</span>
         </div>
+        {/* The right-hand column is hidden on phones, so the button moves here. */}
+        {join && <JoinNowButton href={join} className="mt-2.5 !px-3 !py-1.5 !text-xs sm:hidden" />}
       </div>
 
       <div className="hidden shrink-0 flex-col items-end justify-center gap-1.5 text-right sm:flex">
@@ -70,11 +85,12 @@ export default function EventRow({
         ) : phase === 'upcoming' && closesIn ? (
           <span className="text-xs font-semibold text-[var(--accent)]">Closes in {closesIn}</span>
         ) : null}
+        {join && <JoinNowButton href={join} className="!px-3 !py-1.5 !text-xs" />}
         <span className="text-xs font-bold text-[var(--text-faint)] transition-colors group-hover:text-white">
           View →
         </span>
       </div>
-    </Link>
+    </div>
   )
 }
 

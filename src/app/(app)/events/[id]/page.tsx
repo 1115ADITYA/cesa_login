@@ -4,10 +4,13 @@ import { getClient, getUser } from '@/utils/supabase/server'
 import { isProfileComplete, missingProfileFields } from '@/lib/profileFields'
 import RegisterForm from './RegisterForm'
 import TeamPanel from './TeamPanel'
+import JoinNowButton from '@/components/JoinNowButton'
 import {
   eventPhase,
-  formatDateRange,
+  eventWhen,
+  joinLink,
   registrationDeadline,
+  registrationIsOpen,
   teamSizeLabel,
   timeUntil,
   type EventRow,
@@ -49,7 +52,8 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   const phase = eventPhase(event, now)
   const deadline = registrationDeadline(event)
   const closesIn = timeUntil(deadline, now)
-  const registrationOpen = deadline.getTime() > now
+  const registrationOpen = registrationIsOpen(event, now)
+  const join = phase !== 'past' ? joinLink(event) : null
 
   return (
     <>
@@ -88,16 +92,20 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:items-start">
           <div className="min-w-0">
             <dl className="grid gap-4 sm:grid-cols-3">
-              <Meta label="When" value={formatDateRange(event.starts_at, event.ends_at)} />
+              <Meta label="When" value={eventWhen(event)} />
               <Meta label="Where" value={event.location || 'To be announced'} />
               <Meta
                 label="Registration closes"
-                value={deadline.toLocaleString(undefined, {
-                  day: 'numeric',
-                  month: 'short',
-                  hour: 'numeric',
-                  minute: '2-digit',
-                })}
+                value={
+                  deadline
+                    ? deadline.toLocaleString(undefined, {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })
+                    : 'To be announced'
+                }
               />
             </dl>
 
@@ -118,6 +126,14 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
                   registrationOpen={registrationOpen}
                   eventStarted={phase !== 'upcoming'}
                 />
+              ) : join ? (
+                // The admin has pointed this event at an outside registration
+                // page, so that replaces the built-in form entirely.
+                <div className="glass p-6 text-center">
+                  <p className="font-semibold text-white">Registration happens on an external page</p>
+                  <p className="mt-1 text-sm text-[var(--text-muted)]">Opens in a new tab.</p>
+                  <JoinNowButton href={join} className="mt-4 !px-8 !py-3" />
+                </div>
               ) : registrationOpen ? (
                 <RegisterForm
                   eventId={id}

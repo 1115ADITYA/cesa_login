@@ -1,8 +1,10 @@
 import Link from 'next/link'
+import JoinNowButton from '@/components/JoinNowButton'
 import TeamProgress from '@/components/TeamProgress'
 import {
   eventPhase,
-  formatDateRange,
+  eventWhen,
+  joinLink,
   registrationDeadline,
   teamSizeLabel,
   teamState,
@@ -23,9 +25,12 @@ export default function EventCard({
   const phase = eventPhase(event, now)
   const deadline = registrationDeadline(event)
   const closesIn = timeUntil(deadline, now)
+  const join = phase !== 'past' ? joinLink(event) : null
 
   return (
-    <Link href={`/events/${event.id}`} className="glass card-hover flex flex-col overflow-hidden">
+    // A div with a stretched link rather than one big <Link>: the Join Now
+    // button is an <a> too, and an anchor inside an anchor is invalid HTML.
+    <div className="glass card-hover relative flex flex-col overflow-hidden">
       {event.banner_url && (
         // Admin-supplied URLs from arbitrary hosts, so plain <img> rather than
         // next/image — which would need every host allow-listed up front.
@@ -40,7 +45,11 @@ export default function EventCard({
 
       <div className="flex flex-1 flex-col p-5">
         <div className="flex items-start justify-between gap-3">
-          <h3 className="font-bold leading-snug text-white">{event.title}</h3>
+          <h3 className="font-bold leading-snug text-white">
+            <Link href={`/events/${event.id}`} className="before:absolute before:inset-0">
+              {event.title}
+            </Link>
+          </h3>
           <StatusPill phase={phase} registration={registration} />
         </div>
 
@@ -49,7 +58,7 @@ export default function EventCard({
         )}
 
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-faint)]">
-          <span>{formatDateRange(event.starts_at, event.ends_at)}</span>
+          <span>{eventWhen(event)}</span>
           {event.location && <span>· {event.location}</span>}
           <span>· {teamSizeLabel(event.min_team_size, event.max_team_size)}</span>
         </div>
@@ -71,14 +80,18 @@ export default function EventCard({
             <p className="mt-4 border-t border-[var(--border)] pt-3 text-xs font-semibold">
               {closesIn ? (
                 <span className="text-[var(--accent)]">Registration closes in {closesIn}</span>
+              ) : !deadline ? (
+                <span className="text-[var(--accent)]">Registration open</span>
               ) : (
                 <span className="text-[var(--text-faint)]">Registration closed</span>
               )}
             </p>
           )
         )}
+
+        {join && <JoinNowButton href={join} className="mt-4 w-full !py-2.5" />}
       </div>
-    </Link>
+    </div>
   )
 }
 
