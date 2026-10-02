@@ -8,4 +8,5 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
-//this is not for reading 
+<!-- //this is not for reading  -->
+<!-- //this is temporary -->
