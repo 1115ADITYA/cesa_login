@@ -94,32 +94,46 @@ function toEventFields(formData: FormData): { error: string } | { fields: EventF
   // decided yet — the title included (shown as "Upcoming event" until set).
   const comingSoon = formData.get('schedule') === 'comingSoon'
 
+  // Same for Join Now: registration happens on the linked page, so the link is
+  // the only thing this event needs.
+  const showJoinButton = formData.get('showJoinButton') === 'on'
+  const joinRaw = String(formData.get('joinUrl') || '').trim()
+  const joinUrl = joinRaw ? toHttpUrl(joinRaw) : null
+  if (joinRaw && !joinUrl) return { error: 'The Join Now link must be a full web address, like https://unstop.com/…' }
+  if (showJoinButton && !joinUrl) return { error: 'Paste the link the Join Now button should open.' }
+
+  const allOptional = comingSoon || showJoinButton
+
   const title = String(formData.get('title') || '').trim()
-  if (!title && !comingSoon) return { error: 'Title is required.' }
+  if (!title && !allOptional) return { error: 'Title is required.' }
+
   let startsAt: Date | null = null
   let endsAt: Date | null = null
   let dateLabel: string | null = null
   if (comingSoon) {
     dateLabel = String(formData.get('dateLabel') || '').trim().slice(0, 80) || null
   } else {
-    startsAt = new Date(String(formData.get('startsAt')))
-    endsAt = new Date(String(formData.get('endsAt')))
-    if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+    const startsRaw = String(formData.get('startsAt') || '').trim()
+    const endsRaw = String(formData.get('endsAt') || '').trim()
+    if (!allOptional && (!startsRaw || !endsRaw)) {
       return { error: 'Start and end times are required — or choose "Coming soon".' }
     }
-    if (endsAt < startsAt) return { error: 'The event cannot end before it starts.' }
+    // With Join Now on, one time is enough: it stands in for the other. Both
+    // blank leaves the event undated, which reads as "Coming Soon".
+    if (startsRaw || endsRaw) {
+      startsAt = new Date(startsRaw || endsRaw)
+      endsAt = new Date(endsRaw || startsRaw)
+      if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+        return { error: 'Those start/end times are not valid dates.' }
+      }
+      if (endsAt < startsAt) return { error: 'The event cannot end before it starts.' }
+    }
   }
 
   const closesRaw = String(formData.get('registrationClosesAt') || '').trim()
   const closesAt = closesRaw ? new Date(closesRaw) : null
   if (closesAt && Number.isNaN(closesAt.getTime())) return { error: 'Registration close time is not a valid date.' }
   if (closesAt && endsAt && closesAt > endsAt) return { error: 'Registration cannot close after the event has ended.' }
-
-  const showJoinButton = formData.get('showJoinButton') === 'on'
-  const joinRaw = String(formData.get('joinUrl') || '').trim()
-  const joinUrl = joinRaw ? toHttpUrl(joinRaw) : null
-  if (joinRaw && !joinUrl) return { error: 'The Join Now link must be a full web address, like https://unstop.com/…' }
-  if (showJoinButton && !joinUrl) return { error: 'Paste the link the Join Now button should open.' }
 
   const minRaw = String(formData.get('minTeamSize') || '').trim()
   const maxRaw = String(formData.get('maxTeamSize') || '').trim()

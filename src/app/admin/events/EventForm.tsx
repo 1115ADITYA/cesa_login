@@ -42,6 +42,8 @@ export default function EventForm({
   // An existing event with no start date was saved as Coming Soon.
   const [comingSoon, setComingSoon] = useState(Boolean(defaults && !defaults.startsAt))
   const [showJoin, setShowJoin] = useState(defaults?.showJoinButton ?? false)
+  // Coming Soon or Join Now: the event needs nothing else to be published.
+  const allOptional = comingSoon || showJoin
 
   return (
     <form action={formAction} className="glass flex max-w-xl flex-col gap-4 p-6">
@@ -49,12 +51,12 @@ export default function EventForm({
         <div className="alert alert-error">{state.error}</div>
       )}
 
-      <Field label={comingSoon ? 'Title (optional)' : 'Title'}>
+      <Field label={allOptional ? 'Title (optional)' : 'Title'}>
         <input
           name="title"
-          required={!comingSoon}
+          required={!allOptional}
           defaultValue={defaults?.title}
-          placeholder={comingSoon ? 'Upcoming event' : undefined}
+          placeholder={allOptional ? 'Upcoming event' : undefined}
           className={inputClass}
         />
       </Field>
@@ -82,11 +84,11 @@ export default function EventForm({
           </Field>
         ) : (
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Starts">
-              <input type="datetime-local" name="startsAt" required defaultValue={toLocalInput(defaults?.startsAt)} className={inputClass} />
+            <Field label={showJoin ? 'Starts (optional)' : 'Starts'}>
+              <input type="datetime-local" name="startsAt" required={!showJoin} defaultValue={toLocalInput(defaults?.startsAt)} className={inputClass} />
             </Field>
-            <Field label="Ends">
-              <input type="datetime-local" name="endsAt" required defaultValue={toLocalInput(defaults?.endsAt)} className={inputClass} />
+            <Field label={showJoin ? 'Ends (optional)' : 'Ends'}>
+              <input type="datetime-local" name="endsAt" required={!showJoin} defaultValue={toLocalInput(defaults?.endsAt)} className={inputClass} />
             </Field>
           </div>
         )}
