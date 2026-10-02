@@ -5,7 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { AdminHeader } from '../AdminShell'
 import { deleteEvent } from '../actions'
 import DeleteEventButton from './DeleteEventButton'
-import { eventWhen, joinLink, teamSizeLabel, type EventRow } from '@/lib/events'
+import { eventTitle, eventWhen, joinLink, teamSizeLabel, type EventRow } from '@/lib/events'
 
 export const metadata = { title: 'Events — Admin', robots: { index: false } }
 export const dynamic = 'force-dynamic'
@@ -97,7 +97,7 @@ export default async function AdminEventsPage() {
 
                 <div className="flex flex-1 flex-col p-5">
                   <div className="flex items-start justify-between gap-3">
-                    <h2 className="font-bold leading-snug text-white">{e.title}</h2>
+                    <h2 className="font-bold leading-snug text-white">{eventTitle(e)}</h2>
                     <span className={`pill shrink-0 ${status.tone}`}>{status.label}</span>
                   </div>
                   <p className="mt-1.5 text-sm text-[var(--text-muted)]">

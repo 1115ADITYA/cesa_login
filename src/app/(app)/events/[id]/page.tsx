@@ -7,6 +7,7 @@ import TeamPanel from './TeamPanel'
 import JoinNowButton from '@/components/JoinNowButton'
 import {
   eventPhase,
+  eventTitle,
   eventWhen,
   joinLink,
   registrationDeadline,
@@ -23,7 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params
   const supabase = await getClient()
   const { data } = await supabase.from('events').select('title').eq('id', id).maybeSingle()
-  return { title: data ? `${data.title} — CESA` : 'Event — CESA' }
+  return { title: data ? `${eventTitle(data)} — CESA` : 'Event — CESA' }
 }
 
 export default async function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -82,7 +83,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         </div>
 
         <h1 className="on-art mt-3 font-[family-name:var(--font-space-grotesk)] text-3xl font-bold tracking-tight text-[var(--text-bright)] sm:text-4xl">
-          {event.title}
+          {eventTitle(event)}
         </h1>
 
         {/* Two columns from lg up: the action on the left, the poster pinned on
@@ -169,7 +170,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={event.poster_url}
-                alt={`${event.title} poster`}
+                alt={`${eventTitle(event)} poster`}
                 className="aspect-[9/16] w-full rounded-xl object-contain"
               />
               <p className="px-2 py-2 text-center text-xs text-[var(--text-faint)] transition-colors group-hover:text-[var(--text-muted)]">

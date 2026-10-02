@@ -3,7 +3,7 @@
 import { useActionState } from 'react'
 import { sendAnnouncement } from '../actions'
 
-type EventOption = { id: string; title: string }
+type EventOption = { id: string; title: string | null }
 
 export default function AnnounceForm({ events }: { events: EventOption[] }) {
   const [state, formAction, pending] = useActionState(sendAnnouncement, null)
@@ -21,7 +21,7 @@ export default function AnnounceForm({ events }: { events: EventOption[] }) {
           <option value="all">Every member</option>
           {events.map((e) => (
             <option key={e.id} value={e.id}>
-              Registered for: {e.title}
+              Registered for: {e.title?.trim() || 'Upcoming event'}
             </option>
           ))}
         </select>

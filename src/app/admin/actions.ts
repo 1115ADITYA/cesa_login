@@ -89,11 +89,13 @@ function toHttpUrl(raw: string): string | null {
  * show an admin — these messages are.
  */
 function toEventFields(formData: FormData): { error: string } | { fields: EventFields } {
-  const title = String(formData.get('title') || '').trim()
-  if (!title) return { error: 'Title is required.' }
-
   // "Coming soon" drops the dates entirely and shows the admin's text instead.
+  // Everything else becomes optional too, so a teaser can go up with nothing
+  // decided yet — the title included (shown as "Upcoming event" until set).
   const comingSoon = formData.get('schedule') === 'comingSoon'
+
+  const title = String(formData.get('title') || '').trim()
+  if (!title && !comingSoon) return { error: 'Title is required.' }
   let startsAt: Date | null = null
   let endsAt: Date | null = null
   let dateLabel: string | null = null

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import JoinNowButton from '@/components/JoinNowButton'
 import {
   eventPhase,
+  eventTitle,
   eventWhen,
   joinLink,
   registrationDeadline,
@@ -57,7 +58,7 @@ export default function EventRow({
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="truncate font-bold text-white group-hover:text-[var(--accent-light)]">
             <Link href={`/events/${event.id}`} className="before:absolute before:inset-0">
-              {event.title}
+              {eventTitle(event)}
             </Link>
           </h3>
           <Badge phase={phase} registration={registration} />

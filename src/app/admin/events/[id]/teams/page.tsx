@@ -62,7 +62,7 @@ export default async function EventTeamsPage({ params }: { params: Promise<{ id:
   return (
     <>
       <AdminHeader
-        title={event.title}
+        title={event.title?.trim() || 'Upcoming event'}
         subtitle={`Needs ${event.min_team_size} accepted member${event.min_team_size === 1 ? '' : 's'} for a team to count as confirmed.`}
         back={{ href: '/admin/events', label: 'All events' }}
       />

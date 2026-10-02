@@ -49,8 +49,14 @@ export default function EventForm({
         <div className="alert alert-error">{state.error}</div>
       )}
 
-      <Field label="Title">
-        <input name="title" required defaultValue={defaults?.title} className={inputClass} />
+      <Field label={comingSoon ? 'Title (optional)' : 'Title'}>
+        <input
+          name="title"
+          required={!comingSoon}
+          defaultValue={defaults?.title}
+          placeholder={comingSoon ? 'Upcoming event' : undefined}
+          className={inputClass}
+        />
       </Field>
 
       <Field label="Description">

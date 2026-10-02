@@ -90,6 +90,11 @@ export function teamState(reg: Pick<MyRegistration, 'my_status' | 'accepted_coun
   return reg.accepted_count >= reg.min_team_size ? ('confirmed' as const) : ('forming' as const)
 }
 
+/** A Coming Soon event may be saved without a title; never render a blank heading. */
+export function eventTitle(event: { title: string | null }) {
+  return event.title?.trim() || 'Upcoming event'
+}
+
 /** The "when" line for any event: its date range, or the Coming Soon text. */
 export function eventWhen(event: Pick<EventRow, 'starts_at' | 'ends_at' | 'date_label'>) {
   if (!event.starts_at || !event.ends_at) return event.date_label?.trim() || DEFAULT_DATE_LABEL

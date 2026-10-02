@@ -4,7 +4,7 @@ import { EmptyState } from '@/components/AppShell'
 import TeamProgress from '@/components/TeamProgress'
 import { CardGridSkeleton } from '@/components/Skeletons'
 import { loadEventBoard } from '@/lib/eventData'
-import { teamSizeLabel } from '@/lib/events'
+import { eventTitle, teamSizeLabel } from '@/lib/events'
 
 export const metadata = { title: 'Your teams — CESA' }
 export const dynamic = 'force-dynamic'
@@ -63,7 +63,7 @@ async function MyTeamsContent() {
             <Link key={r.team_id} href={`/events/${r.event_id}`} className="glass card-hover flex flex-col p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="eyebrow">{event?.title ?? 'Event'}</p>
+                  <p className="eyebrow">{event ? eventTitle(event) : 'Event'}</p>
                   <h2 className="heading mt-1 truncate text-xl">{r.team_name}</h2>
                 </div>
                 {r.confirmed ? (

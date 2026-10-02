@@ -3,6 +3,7 @@ import JoinNowButton from '@/components/JoinNowButton'
 import TeamProgress from '@/components/TeamProgress'
 import {
   eventPhase,
+  eventTitle,
   eventWhen,
   joinLink,
   registrationDeadline,
@@ -47,7 +48,7 @@ export default function EventCard({
         <div className="flex items-start justify-between gap-3">
           <h3 className="font-bold leading-snug text-white">
             <Link href={`/events/${event.id}`} className="before:absolute before:inset-0">
-              {event.title}
+              {eventTitle(event)}
             </Link>
           </h3>
           <StatusPill phase={phase} registration={registration} />
