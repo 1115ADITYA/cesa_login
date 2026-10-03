@@ -61,6 +61,7 @@ type EventFields = {
   max_team_size: number | null
   join_url: string | null
   show_join_button: boolean
+  custom_text: string | null
 }
 
 /** Only "N% N%" is ever written by BannerUpload.tsx — anything else is either absent or tampered with. */
@@ -130,13 +131,18 @@ function toEventFields(formData: FormData): { error: string } | { fields: EventF
     }
   }
 
-  const closesRaw = String(formData.get('registrationClosesAt') || '').trim()
+  // Coming Soon / Join Now events take no registrations here (see 0012), so
+  // the deadline and team sizes are not even in the form — reset them rather
+  // than keep stale values around. custom_text is shown in their place.
+  const customText = allOptional ? String(formData.get('customText') || '').trim().slice(0, 2000) || null : null
+
+  const closesRaw = allOptional ? '' : String(formData.get('registrationClosesAt') || '').trim()
   const closesAt = closesRaw ? new Date(closesRaw) : null
   if (closesAt && Number.isNaN(closesAt.getTime())) return { error: 'Registration close time is not a valid date.' }
   if (closesAt && endsAt && closesAt > endsAt) return { error: 'Registration cannot close after the event has ended.' }
 
-  const minRaw = String(formData.get('minTeamSize') || '').trim()
-  const maxRaw = String(formData.get('maxTeamSize') || '').trim()
+  const minRaw = allOptional ? '' : String(formData.get('minTeamSize') || '').trim()
+  const maxRaw = allOptional ? '' : String(formData.get('maxTeamSize') || '').trim()
   const minTeamSize = minRaw ? Number(minRaw) : 1
   const maxTeamSize = maxRaw ? Number(maxRaw) : null
 
@@ -164,6 +170,7 @@ function toEventFields(formData: FormData): { error: string } | { fields: EventF
       max_team_size: maxTeamSize,
       join_url: joinUrl,
       show_join_button: showJoinButton,
+      custom_text: customText,
     },
   }
 }

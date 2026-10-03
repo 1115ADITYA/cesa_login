@@ -36,6 +36,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
             registrationClosesAt: event.registration_closes_at ?? '',
             joinUrl: event.join_url ?? '',
             showJoinButton: event.show_join_button ?? false,
+            customText: event.custom_text ?? '',
             minTeamSize: event.min_team_size,
             maxTeamSize: event.max_team_size,
           }}

@@ -17,6 +17,7 @@ type EventDefaults = {
   registrationClosesAt?: string
   joinUrl?: string
   showJoinButton?: boolean
+  customText?: string
   minTeamSize?: number | null
   maxTeamSize?: number | null
 }
@@ -94,38 +95,6 @@ export default function EventForm({
         )}
       </fieldset>
 
-      <Field label={comingSoon ? 'Registration closes (blank = stays open)' : 'Registration closes (blank = when the event starts)'}>
-        <input
-          type="datetime-local"
-          name="registrationClosesAt"
-          defaultValue={toLocalInput(defaults?.registrationClosesAt)}
-          className={inputClass}
-        />
-      </Field>
-
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Min team size">
-          <input
-            type="number"
-            min={1}
-            name="minTeamSize"
-            defaultValue={defaults?.minTeamSize ?? 1}
-            className={inputClass}
-          />
-        </Field>
-        <Field label="Max team size (blank = no cap)">
-          <input type="number" min={1} name="maxTeamSize" defaultValue={defaults?.maxTeamSize ?? ''} className={inputClass} />
-        </Field>
-      </div>
-      <p className="-mt-2 text-xs text-[var(--text-faint)]">
-        A team is only <strong className="text-[var(--text)]">confirmed</strong> once the minimum number of members have
-        accepted their invitations. Set both to 1 for a solo event — participants then register without naming a team.
-      </p>
-
-      <Field label="Location (optional)">
-        <input name="location" defaultValue={defaults?.location} className={inputClass} />
-      </Field>
-
       <div className="flex flex-col gap-3">
         <label className="flex items-center gap-2.5 text-sm font-semibold text-[var(--text)]">
           <input
@@ -151,10 +120,61 @@ export default function EventForm({
             />
           </Field>
           <p className="mt-1.5 text-xs text-[var(--text-faint)]">
-            Replaces the built-in registration form — members are sent to this link instead. Opens in a new tab.
+            Members are sent to this link instead of registering on this site. Opens in a new tab.
           </p>
         </div>
       </div>
+
+      {allOptional ? (
+        <Field label="Text shown instead of registration (optional)">
+          <textarea
+            name="customText"
+            rows={3}
+            maxLength={2000}
+            defaultValue={defaults?.customText}
+            placeholder={showJoin ? 'e.g. Registrations are on Unstop — team size 2–4.' : 'e.g. Details dropping next week. Stay tuned!'}
+            className={inputClass}
+          />
+          <p className="mt-0.5 text-xs text-[var(--text-faint)]">
+            {comingSoon ? 'Coming soon' : 'Join Now'} events take no registrations on this site, so the form, deadline and
+            team sizes are hidden. This text appears in their place.
+          </p>
+        </Field>
+      ) : (
+        <>
+          <Field label="Registration closes (blank = when the event starts)">
+            <input
+              type="datetime-local"
+              name="registrationClosesAt"
+              defaultValue={toLocalInput(defaults?.registrationClosesAt)}
+              className={inputClass}
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Min team size">
+              <input
+                type="number"
+                min={1}
+                name="minTeamSize"
+                defaultValue={defaults?.minTeamSize ?? 1}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Max team size (blank = no cap)">
+              <input type="number" min={1} name="maxTeamSize" defaultValue={defaults?.maxTeamSize ?? ''} className={inputClass} />
+            </Field>
+          </div>
+          <p className="-mt-2 text-xs text-[var(--text-faint)]">
+            A team is only <strong className="text-[var(--text)]">confirmed</strong> once the minimum number of members have
+            accepted their invitations. Set both to 1 for a solo event — participants then register without naming a team.
+          </p>
+        </>
+      )}
+
+      <Field label="Location (optional)">
+        <input name="location" defaultValue={defaults?.location} className={inputClass} />
+      </Field>
 
       <ImageUpload
         name="bannerUrl"

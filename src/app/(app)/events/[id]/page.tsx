@@ -14,6 +14,7 @@ import {
   registrationIsOpen,
   teamSizeLabel,
   timeUntil,
+  usesSiteRegistration,
   type EventRow,
   type EventTeam,
 } from '@/lib/events'
@@ -55,6 +56,9 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   const closesIn = timeUntil(deadline, now)
   const registrationOpen = registrationIsOpen(event, now)
   const join = phase !== 'past' ? joinLink(event) : null
+  // Coming Soon / Join Now: no registration on this page at all — not the
+  // form, the team panel, the deadline or the team size. Custom text instead.
+  const siteRegistration = usesSiteRegistration(event)
 
   return (
     <>
@@ -71,14 +75,18 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             </span>
           )}
           {phase === 'past' && <span className="pill bg-white/5 text-[var(--text-faint)]">Ended</span>}
-          <span className="pill bg-white/5 text-[var(--text-muted)]">
-            {teamSizeLabel(event.min_team_size, event.max_team_size)}
-          </span>
-          {registrationOpen && closesIn && (
-            <span className="pill bg-[var(--accent)]/12 text-[var(--accent)]">Registration closes in {closesIn}</span>
-          )}
-          {!registrationOpen && phase !== 'past' && (
-            <span className="pill bg-white/5 text-[var(--text-faint)]">Registration closed</span>
+          {siteRegistration && (
+            <>
+              <span className="pill bg-white/5 text-[var(--text-muted)]">
+                {teamSizeLabel(event.min_team_size, event.max_team_size)}
+              </span>
+              {registrationOpen && closesIn && (
+                <span className="pill bg-[var(--accent)]/12 text-[var(--accent)]">Registration closes in {closesIn}</span>
+              )}
+              {!registrationOpen && phase !== 'past' && (
+                <span className="pill bg-white/5 text-[var(--text-faint)]">Registration closed</span>
+              )}
+            </>
           )}
         </div>
 
@@ -92,22 +100,24 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             fills the form rather than being scrolled past at the top. */}
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:items-start">
           <div className="min-w-0">
-            <dl className="grid gap-4 sm:grid-cols-3">
+            <dl className={`grid gap-4 ${siteRegistration ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
               <Meta label="When" value={eventWhen(event)} />
               <Meta label="Where" value={event.location || 'To be announced'} />
-              <Meta
-                label="Registration closes"
-                value={
-                  deadline
-                    ? deadline.toLocaleString(undefined, {
-                        day: 'numeric',
-                        month: 'short',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      })
-                    : 'To be announced'
-                }
-              />
+              {siteRegistration && (
+                <Meta
+                  label="Registration closes"
+                  value={
+                    deadline
+                      ? deadline.toLocaleString(undefined, {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        })
+                      : 'To be announced'
+                  }
+                />
+              )}
             </dl>
 
             {event.description && (
@@ -118,7 +128,21 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             )}
 
             <div className="mt-8">
-              {team ? (
+              {!siteRegistration ? (
+                (event.custom_text?.trim() || join) && (
+                  <div className="glass p-6 text-center">
+                    {event.custom_text?.trim() && (
+                      <p className="whitespace-pre-wrap leading-relaxed text-[var(--text)]">{event.custom_text}</p>
+                    )}
+                    {join && (
+                      <JoinNowButton
+                        href={join}
+                        className={`!px-8 !py-3 ${event.custom_text?.trim() ? 'mt-4' : ''}`}
+                      />
+                    )}
+                  </div>
+                )
+              ) : team ? (
                 <TeamPanel
                   eventId={id}
                   team={team}
@@ -127,14 +151,6 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
                   registrationOpen={registrationOpen}
                   eventStarted={phase !== 'upcoming'}
                 />
-              ) : join ? (
-                // The admin has pointed this event at an outside registration
-                // page, so that replaces the built-in form entirely.
-                <div className="glass p-6 text-center">
-                  <p className="font-semibold text-white">Registration happens on an external page</p>
-                  <p className="mt-1 text-sm text-[var(--text-muted)]">Opens in a new tab.</p>
-                  <JoinNowButton href={join} className="mt-4 !px-8 !py-3" />
-                </div>
               ) : registrationOpen ? (
                 <RegisterForm
                   eventId={id}

@@ -3,7 +3,7 @@ import { unstable_cache } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getClient, getUser } from '@/utils/supabase/server'
-import { eventPhase, registrationIsOpen, type EventRow, type MyRegistration } from './events'
+import { eventPhase, registrationIsOpen, usesSiteRegistration, type EventRow, type MyRegistration } from './events'
 
 export const EVENTS_TAG = 'events'
 
@@ -66,8 +66,12 @@ export async function loadEventBoard() {
     /** Events the caller has joined or been invited to, soonest first. */
     mine: all.filter((e) => byEvent.has(e.id)),
     live: all.filter((e) => eventPhase(e, now) === 'live'),
+    /** Coming Soon and Join Now events — upcoming, but no registration here. */
+    announced: all.filter((e) => eventPhase(e, now) === 'upcoming' && !usesSiteRegistration(e)),
     open: all.filter((e) => eventPhase(e, now) === 'upcoming' && registrationIsOpen(e, now)),
-    closed: all.filter((e) => eventPhase(e, now) === 'upcoming' && !registrationIsOpen(e, now)),
+    closed: all.filter(
+      (e) => eventPhase(e, now) === 'upcoming' && usesSiteRegistration(e) && !registrationIsOpen(e, now),
+    ),
     past: all.filter((e) => eventPhase(e, now) === 'past'),
   }
 }

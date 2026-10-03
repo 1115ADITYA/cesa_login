@@ -53,9 +53,20 @@ export type EventRow = {
   /** Outside registration page behind the Join Now button. */
   join_url: string | null
   show_join_button: boolean
+  /** Shown where registration would be, for events that take none. */
+  custom_text: string | null
 }
 
 export const DEFAULT_DATE_LABEL = 'Coming Soon'
+
+/**
+ * Coming Soon (undated) and Join Now events take no registrations here — the
+ * admin's custom_text stands in for the form. Mirrors registration_is_open()
+ * in 0012.
+ */
+export function usesSiteRegistration(event: Pick<EventRow, 'starts_at' | 'show_join_button'>) {
+  return !event.show_join_button && event.starts_at !== null
+}
 
 /**
  * Registration deadline, falling back to the start of the event. Null when
@@ -67,9 +78,12 @@ export function registrationDeadline(event: Pick<EventRow, 'registration_closes_
   return at ? new Date(at) : null
 }
 
-export function registrationIsOpen(event: Pick<EventRow, 'registration_closes_at' | 'starts_at'>, now: number) {
+export function registrationIsOpen(
+  event: Pick<EventRow, 'registration_closes_at' | 'starts_at' | 'show_join_button'>,
+  now: number,
+) {
   const deadline = registrationDeadline(event)
-  return deadline === null || deadline.getTime() > now
+  return usesSiteRegistration(event) && deadline !== null && deadline.getTime() > now
 }
 
 export function eventPhase(event: Pick<EventRow, 'starts_at' | 'ends_at'>, now: number) {

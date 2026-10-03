@@ -8,6 +8,7 @@ import {
   registrationDeadline,
   teamSizeLabel,
   teamState,
+  usesSiteRegistration,
   timeUntil,
   type EventRow as EventRecord,
   type MyRegistration,
@@ -19,7 +20,7 @@ import {
  */
 export default function EventRow({
   event,
-  registration,
+  registration: registrationProp,
   now,
 }: {
   event: EventRecord
@@ -31,6 +32,9 @@ export default function EventRow({
   const closesIn = timeUntil(deadline, now)
   const start = event.starts_at ? new Date(event.starts_at) : null
   const join = phase !== 'past' ? joinLink(event) : null
+  // Coming Soon / Join Now: no registration details, custom text instead.
+  const siteRegistration = usesSiteRegistration(event)
+  const registration = siteRegistration ? registrationProp : null
 
   return (
     // Stretched link, not a wrapping <Link> — see EventCard.
@@ -67,11 +71,14 @@ export default function EventRow({
         {event.description && (
           <p className="mt-1 line-clamp-1 text-sm text-[var(--text-muted)]">{event.description}</p>
         )}
+        {!siteRegistration && event.custom_text?.trim() && (
+          <p className="mt-1 line-clamp-1 text-sm text-[var(--text-muted)]">{event.custom_text}</p>
+        )}
 
         <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-[var(--text-faint)]">
           <span>{eventWhen(event)}</span>
           {event.location && <span>· {event.location}</span>}
-          <span>· {teamSizeLabel(event.min_team_size, event.max_team_size)}</span>
+          {siteRegistration && <span>· {teamSizeLabel(event.min_team_size, event.max_team_size)}</span>}
         </div>
         {/* The right-hand column is hidden on phones, so the button moves here. */}
         {join && <JoinNowButton href={join} className="mt-2.5 !px-3 !py-1.5 !text-xs sm:hidden" />}
@@ -83,7 +90,7 @@ export default function EventRow({
             <span className="font-bold text-[var(--text-bright)]">{registration.accepted_count}</span>
             {registration.max_team_size ? `/${registration.max_team_size}` : ''} confirmed
           </span>
-        ) : phase === 'upcoming' && closesIn ? (
+        ) : siteRegistration && phase === 'upcoming' && closesIn ? (
           <span className="text-xs font-semibold text-[var(--accent)]">Closes in {closesIn}</span>
         ) : null}
         {join && <JoinNowButton href={join} className="!px-3 !py-1.5 !text-xs" />}

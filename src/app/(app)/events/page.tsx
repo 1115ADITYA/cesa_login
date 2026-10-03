@@ -27,7 +27,7 @@ export default function EventsPage() {
 }
 
 async function EventsContent() {
-  const { now, all, live, open, closed, past, byEvent } = await loadEventBoard()
+  const { now, all, live, announced, open, closed, past, byEvent } = await loadEventBoard()
 
   return (
     <>
@@ -47,6 +47,16 @@ async function EventsContent() {
               <div className="grid gap-4 md:grid-cols-2">
                 {live.map((e) => (
                   <EventCard key={e.id} event={e} registration={byEvent.get(e.id) ?? null} now={now} />
+                ))}
+              </div>
+            </Band>
+          )}
+
+          {announced.length > 0 && (
+            <Band title="Coming up">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {announced.map((e) => (
+                  <EventCard key={e.id} event={e} registration={null} now={now} />
                 ))}
               </div>
             </Band>

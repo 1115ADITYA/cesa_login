@@ -9,6 +9,7 @@ import {
   registrationDeadline,
   teamSizeLabel,
   teamState,
+  usesSiteRegistration,
   timeUntil,
   type EventRow,
   type MyRegistration,
@@ -16,7 +17,7 @@ import {
 
 export default function EventCard({
   event,
-  registration,
+  registration: registrationProp,
   now,
 }: {
   event: EventRow
@@ -27,6 +28,9 @@ export default function EventCard({
   const deadline = registrationDeadline(event)
   const closesIn = timeUntil(deadline, now)
   const join = phase !== 'past' ? joinLink(event) : null
+  // Coming Soon / Join Now: no registration anywhere on the card, custom text instead.
+  const siteRegistration = usesSiteRegistration(event)
+  const registration = siteRegistration ? registrationProp : null
 
   return (
     // A div with a stretched link rather than one big <Link>: the Join Now
@@ -61,10 +65,16 @@ export default function EventCard({
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-faint)]">
           <span>{eventWhen(event)}</span>
           {event.location && <span>· {event.location}</span>}
-          <span>· {teamSizeLabel(event.min_team_size, event.max_team_size)}</span>
+          {siteRegistration && <span>· {teamSizeLabel(event.min_team_size, event.max_team_size)}</span>}
         </div>
 
-        {registration ? (
+        {!siteRegistration ? (
+          event.custom_text?.trim() && (
+            <p className="mt-4 line-clamp-3 whitespace-pre-line border-t border-[var(--border)] pt-3 text-xs text-[var(--text-muted)]">
+              {event.custom_text}
+            </p>
+          )
+        ) : registration ? (
           <div className="mt-4 border-t border-[var(--border)] pt-3">
             <p className="mb-2 text-xs text-[var(--text-muted)]">
               Team <span className="font-bold text-[var(--text-bright)]">{registration.team_name}</span>
@@ -81,8 +91,6 @@ export default function EventCard({
             <p className="mt-4 border-t border-[var(--border)] pt-3 text-xs font-semibold">
               {closesIn ? (
                 <span className="text-[var(--accent)]">Registration closes in {closesIn}</span>
-              ) : !deadline ? (
-                <span className="text-[var(--accent)]">Registration open</span>
               ) : (
                 <span className="text-[var(--text-faint)]">Registration closed</span>
               )}

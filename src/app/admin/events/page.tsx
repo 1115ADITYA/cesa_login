@@ -5,7 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { AdminHeader } from '../AdminShell'
 import { deleteEvent } from '../actions'
 import DeleteEventButton from './DeleteEventButton'
-import { eventTitle, eventWhen, joinLink, teamSizeLabel, type EventRow } from '@/lib/events'
+import { eventTitle, eventWhen, joinLink, teamSizeLabel, usesSiteRegistration, type EventRow } from '@/lib/events'
 
 export const metadata = { title: 'Events — Admin', robots: { index: false } }
 export const dynamic = 'force-dynamic'
@@ -102,7 +102,8 @@ export default async function AdminEventsPage() {
                   </div>
                   <p className="mt-1.5 text-sm text-[var(--text-muted)]">
                     {eventWhen(e)}
-                    {e.location ? ` · ${e.location}` : ''} · {teamSizeLabel(e.min_team_size, e.max_team_size)}
+                    {e.location ? ` · ${e.location}` : ''}
+                    {usesSiteRegistration(e) ? ` · ${teamSizeLabel(e.min_team_size, e.max_team_size)}` : ''}
                   </p>
                   {joinLink(e) && (
                     <p className="mt-2 truncate text-xs text-[var(--text-faint)]">
@@ -112,13 +113,17 @@ export default async function AdminEventsPage() {
                       </a>
                     </p>
                   )}
-                  <p className="mt-2 text-xs text-[var(--text-faint)]">
-                    <span className="font-bold text-[var(--text)]">{ids.length}</span> registered ·{' '}
-                    <span className="font-bold text-[var(--success)]">{confirmed}</span> confirmed
-                    {ids.length - confirmed > 0 && (
-                      <span className="text-[var(--warning)]"> · {ids.length - confirmed} still forming</span>
-                    )}
-                  </p>
+                  {usesSiteRegistration(e) ? (
+                    <p className="mt-2 text-xs text-[var(--text-faint)]">
+                      <span className="font-bold text-[var(--text)]">{ids.length}</span> registered ·{' '}
+                      <span className="font-bold text-[var(--success)]">{confirmed}</span> confirmed
+                      {ids.length - confirmed > 0 && (
+                        <span className="text-[var(--warning)]"> · {ids.length - confirmed} still forming</span>
+                      )}
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-xs text-[var(--text-faint)]">No registration on this site</p>
+                  )}
 
                   <div className="mt-4 flex items-center gap-2 border-t border-[var(--border)] pt-3 text-sm font-semibold">
                     <Link href={`/admin/events/${e.id}/teams`} className="btn btn-ghost !px-3 !py-2 !text-xs">
