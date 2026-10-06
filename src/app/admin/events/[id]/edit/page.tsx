@@ -4,7 +4,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { AdminHeader } from '../../../AdminShell'
 import EventForm from '../../EventForm'
 import { updateEvent } from '../../../actions'
-import { sanitizeFields } from '@/lib/formFields'
+import { sanitizeFields, sanitizeMaxUploadMb } from '@/lib/formFields'
 
 export const metadata = { title: 'Edit event — Admin', robots: { index: false } }
 
@@ -40,6 +40,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
             customText: event.custom_text ?? '',
             allowInvites: event.allow_invites ?? true,
             formFields: sanitizeFields(event.form_fields),
+            maxUploadMb: sanitizeMaxUploadMb(event.max_upload_mb),
             minTeamSize: event.min_team_size,
             maxTeamSize: event.max_team_size,
           }}

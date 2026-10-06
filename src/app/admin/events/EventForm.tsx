@@ -24,6 +24,7 @@ type EventDefaults = {
   maxTeamSize?: number | null
   allowInvites?: boolean
   formFields?: FormField[]
+  maxUploadMb?: number
 }
 
 /** `datetime-local` wants "YYYY-MM-DDTHH:mm", not a full ISO string. */
@@ -194,7 +195,11 @@ export default function EventForm({
             </p>
           )}
 
-          <FormBuilder name="formFields" defaultFields={defaults?.formFields} />
+          <FormBuilder
+            name="formFields"
+            defaultFields={defaults?.formFields}
+            defaultMaxUploadMb={defaults?.maxUploadMb}
+          />
         </>
       )}
 

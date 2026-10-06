@@ -2,7 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getClient, getUser } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { sanitizeFields, type Answers } from '@/lib/formFields'
+import { sanitizeFields, sanitizeMaxUploadMb, type Answers } from '@/lib/formFields'
 import { isProfileComplete, missingProfileFields } from '@/lib/profileFields'
 import RegisterForm from './RegisterForm'
 import TeamPanel from './TeamPanel'
@@ -165,6 +165,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
                   formFields={formFields}
                   answers={answers}
                   userId={user.id}
+                  maxUploadMb={sanitizeMaxUploadMb(event.max_upload_mb)}
                 />
               ) : registrationOpen ? (
                 <RegisterForm
@@ -177,6 +178,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
                   formFields={formFields}
                   allowInvites={event.allow_invites ?? true}
                   userId={user.id}
+                  maxUploadMb={sanitizeMaxUploadMb(event.max_upload_mb)}
                 />
               ) : (
                 <div className="glass p-6 text-center">

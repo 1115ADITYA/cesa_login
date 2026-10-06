@@ -29,8 +29,7 @@ export type FormField = {
   required: boolean
   /** select / radio / checkboxes */
   options?: string[]
-  /** video only */
-  maxSizeMb?: number
+  /** video only — the size limit is per event (events.max_upload_mb). */
   maxDurationSec?: number
 }
 
@@ -42,8 +41,8 @@ export const VIDEO_BUCKET = 'event-submissions'
 export const VIDEO_MIME_TYPES = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-matroska']
 /** Ceiling an admin can set; Supabase's project upload limit may be lower. */
 export const MAX_VIDEO_MB = 500
+export const DEFAULT_VIDEO_MB = 50
 export const MAX_VIDEO_SECONDS = 3600
-const DEFAULT_VIDEO_MB = 50
 const DEFAULT_VIDEO_SECONDS = 120
 
 const MAX_FIELDS = 30
@@ -95,12 +94,16 @@ export function sanitizeFields(raw: unknown): FormField[] {
       field.options = options
     }
     if (type === 'video') {
-      field.maxSizeMb = clampInt(f.maxSizeMb, 1, MAX_VIDEO_MB, DEFAULT_VIDEO_MB)
       field.maxDurationSec = clampInt(f.maxDurationSec, 5, MAX_VIDEO_SECONDS, DEFAULT_VIDEO_SECONDS)
     }
     fields.push(field)
   }
   return fields
+}
+
+/** The event's upload limit, clamped to what 0014's check constraint allows. */
+export function sanitizeMaxUploadMb(raw: unknown) {
+  return clampInt(raw, 1, MAX_VIDEO_MB, DEFAULT_VIDEO_MB)
 }
 
 export function isVideoAnswer(value: unknown): value is VideoAnswer {

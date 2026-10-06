@@ -25,6 +25,7 @@ export default function RegisterForm({
   formFields,
   allowInvites,
   userId,
+  maxUploadMb,
 }: {
   eventId: string
   minTeamSize: number
@@ -35,6 +36,7 @@ export default function RegisterForm({
   formFields: FormField[]
   allowInvites: boolean
   userId: string
+  maxUploadMb: number
 }) {
   const router = useRouter()
   const solo = maxTeamSize === 1
@@ -135,6 +137,7 @@ export default function RegisterForm({
             onChange={setAnswers}
             eventId={eventId}
             userId={userId}
+            maxUploadMb={maxUploadMb}
             onUploadingChange={setUploading}
           />
         </div>

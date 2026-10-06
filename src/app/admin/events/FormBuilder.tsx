@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import {
+  DEFAULT_VIDEO_MB,
   FIELD_TYPES,
   MAX_VIDEO_MB,
   MAX_VIDEO_SECONDS,
@@ -16,8 +17,18 @@ import {
  * action as one JSON string in a hidden input, and is re-sanitised there
  * (sanitizeFields) — nothing here is trusted.
  */
-export default function FormBuilder({ name, defaultFields }: { name: string; defaultFields?: FormField[] }) {
+export default function FormBuilder({
+  name,
+  defaultFields,
+  defaultMaxUploadMb,
+}: {
+  name: string
+  defaultFields?: FormField[]
+  defaultMaxUploadMb?: number
+}) {
   const [fields, setFields] = useState<FormField[]>(defaultFields ?? [])
+  const [maxUploadMb, setMaxUploadMb] = useState(defaultMaxUploadMb ?? DEFAULT_VIDEO_MB)
+  const hasVideo = fields.some((f) => f.type === 'video')
 
   const update = (id: string, patch: Partial<FormField>) =>
     setFields((all) => all.map((f) => (f.id === id ? { ...f, ...patch } : f)))
@@ -36,7 +47,6 @@ export default function FormBuilder({ name, defaultFields }: { name: string; def
     const patch: Partial<FormField> = { type }
     if (hasOptions(type) && !field.options?.length) patch.options = ['Option 1']
     if (type === 'video') {
-      patch.maxSizeMb = field.maxSizeMb ?? 50
       patch.maxDurationSec = field.maxDurationSec ?? 120
     }
     update(field.id, patch)
@@ -145,32 +155,18 @@ export default function FormBuilder({ name, defaultFields }: { name: string; def
           )}
 
           {field.type === 'video' && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <label className="label">Max size (MB)</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={MAX_VIDEO_MB}
-                  value={field.maxSizeMb ?? 50}
-                  onChange={(e) => update(field.id, { maxSizeMb: Number(e.target.value) })}
-                  className="field"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="label">Max length (seconds)</label>
-                <input
-                  type="number"
-                  min={5}
-                  max={MAX_VIDEO_SECONDS}
-                  value={field.maxDurationSec ?? 120}
-                  onChange={(e) => update(field.id, { maxDurationSec: Number(e.target.value) })}
-                  className="field"
-                />
-              </div>
-              <p className="col-span-2 text-xs text-[var(--text-faint)]">
-                MP4, WebM, MOV or MKV. Supabase&apos;s project upload limit (Storage → Settings) must be at least
-                this size.
+            <div className="flex flex-col gap-1.5">
+              <label className="label">Max length (seconds)</label>
+              <input
+                type="number"
+                min={5}
+                max={MAX_VIDEO_SECONDS}
+                value={field.maxDurationSec ?? 120}
+                onChange={(e) => update(field.id, { maxDurationSec: Number(e.target.value) })}
+                className="field !w-40"
+              />
+              <p className="text-xs text-[var(--text-faint)]">
+                MP4, WebM, MOV or MKV. The size limit is set once for the whole event, below.
               </p>
             </div>
           )}
@@ -180,6 +176,32 @@ export default function FormBuilder({ name, defaultFields }: { name: string; def
       <button type="button" onClick={add} className="btn btn-ghost self-start !py-2 !text-sm">
         + Add question
       </button>
+
+      {/* One limit for every video question in this event. Posted even when
+          there are no video questions, so the saved value is kept. */}
+      {hasVideo ? (
+        <div className="flex flex-col gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-sunken)] p-4">
+          <label htmlFor="maxUploadMb" className="label">
+            Max upload size for this event (MB)
+          </label>
+          <input
+            id="maxUploadMb"
+            type="number"
+            name="maxUploadMb"
+            min={1}
+            max={MAX_VIDEO_MB}
+            value={maxUploadMb}
+            onChange={(e) => setMaxUploadMb(Number(e.target.value))}
+            className="field !w-40"
+          />
+          <p className="text-xs text-[var(--text-faint)]">
+            Applies to every video question above. Supabase&apos;s project upload limit (Storage → Settings) must be at
+            least this size — 50 MB is the most the Free plan allows.
+          </p>
+        </div>
+      ) : (
+        <input type="hidden" name="maxUploadMb" value={maxUploadMb} />
+      )}
     </div>
   )
 }

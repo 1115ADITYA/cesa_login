@@ -8,6 +8,7 @@ import {
   VIDEO_MIME_TYPES,
   isVideoAnswer,
   sanitizeFields,
+  sanitizeMaxUploadMb,
   validateAnswers,
   type Answers,
 } from '@/lib/formFields'
@@ -44,10 +45,11 @@ async function checkAnswers(
   saved: Answers = {},
 ): Promise<{ error: string } | { answers: Answers }> {
   const admin = createAdminClient()
-  const { data: event } = await admin.from('events').select('form_fields').eq('id', eventId).maybeSingle()
+  const { data: event } = await admin.from('events').select('form_fields, max_upload_mb').eq('id', eventId).maybeSingle()
   if (!event) return { error: 'This event no longer exists.' }
 
   const fields = sanitizeFields(event.form_fields)
+  const maxUploadMb = sanitizeMaxUploadMb(event.max_upload_mb)
   const result = validateAnswers(fields, raw)
   if ('error' in result) return result
 
@@ -69,8 +71,8 @@ async function checkAnswers(
     if (!object) return { error: `The video for "${field.label}" did not finish uploading — upload it again.` }
 
     const size = Number(object.metadata?.size ?? 0)
-    if (size > field.maxSizeMb! * 1024 * 1024) {
-      return { error: `The video for "${field.label}" is over ${field.maxSizeMb} MB.` }
+    if (size > maxUploadMb * 1024 * 1024) {
+      return { error: `The video for "${field.label}" is over ${maxUploadMb} MB.` }
     }
     const mime = String(object.metadata?.mimetype ?? '')
     if (mime && !VIDEO_MIME_TYPES.includes(mime)) return { error: `"${field.label}" must be a video.` }

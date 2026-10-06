@@ -59,6 +59,8 @@ export type EventRow = {
   form_fields: unknown
   /** "Invite teammates by username"; off means solo registration. */
   allow_invites: boolean
+  /** Size limit for every video answer in this event. */
+  max_upload_mb: number
 }
 
 export const DEFAULT_DATE_LABEL = 'Coming Soon'

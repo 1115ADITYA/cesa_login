@@ -20,6 +20,7 @@ export default function TeamPanel({
   formFields,
   answers,
   userId,
+  maxUploadMb,
 }: {
   eventId: string
   team: EventTeam
@@ -31,6 +32,7 @@ export default function TeamPanel({
   formFields: FormField[]
   answers: Answers
   userId: string
+  maxUploadMb: number
 }) {
   const router = useRouter()
   const [inviting, setInviting] = useState(false)
@@ -155,6 +157,7 @@ export default function TeamPanel({
           answers={answers}
           canEdit={team.isLeader && registrationOpen}
           userId={userId}
+          maxUploadMb={maxUploadMb}
         />
       )}
 
@@ -275,6 +278,7 @@ function TeamAnswers({
   answers,
   canEdit,
   userId,
+  maxUploadMb,
 }: {
   teamId: string
   eventId: string
@@ -282,6 +286,7 @@ function TeamAnswers({
   answers: Answers
   canEdit: boolean
   userId: string
+  maxUploadMb: number
 }) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
@@ -335,6 +340,7 @@ function TeamAnswers({
             onChange={setDraft}
             eventId={eventId}
             userId={userId}
+            maxUploadMb={maxUploadMb}
             onUploadingChange={setUploading}
           />
           {error && <div className="alert alert-error">{error}</div>}

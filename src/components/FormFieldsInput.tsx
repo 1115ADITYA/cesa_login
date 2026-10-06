@@ -24,6 +24,7 @@ export default function FormFieldsInput({
   onChange,
   eventId,
   userId,
+  maxUploadMb,
   onUploadingChange,
 }: {
   fields: FormField[]
@@ -31,6 +32,8 @@ export default function FormFieldsInput({
   onChange: (answers: Answers) => void
   eventId: string
   userId: string
+  /** The event's limit for every video question. */
+  maxUploadMb: number
   onUploadingChange?: (uploading: boolean) => void
 }) {
   const set = (id: string, value: Answer | undefined) => {
@@ -108,6 +111,7 @@ export default function FormFieldsInput({
                 onChange={(v) => set(field.id, v ?? undefined)}
                 eventId={eventId}
                 userId={userId}
+                maxUploadMb={maxUploadMb}
                 onUploadingChange={onUploadingChange}
               />
             ) : (
@@ -171,6 +175,7 @@ function VideoInput({
   onChange,
   eventId,
   userId,
+  maxUploadMb,
   onUploadingChange,
 }: {
   field: FormField
@@ -178,17 +183,18 @@ function VideoInput({
   onChange: (value: VideoAnswer | null) => void
   eventId: string
   userId: string
+  maxUploadMb: number
   onUploadingChange?: (uploading: boolean) => void
 }) {
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const maxBytes = field.maxSizeMb! * 1024 * 1024
+  const maxBytes = maxUploadMb * 1024 * 1024
 
   const pick = async (file: File | undefined) => {
     setError(null)
     if (!file) return
     if (!VIDEO_MIME_TYPES.includes(file.type)) return setError('Use an MP4, WebM, MOV or MKV video.')
-    if (file.size > maxBytes) return setError(`That video is ${(file.size / 1024 / 1024).toFixed(1)} MB — the limit is ${field.maxSizeMb} MB.`)
+    if (file.size > maxBytes) return setError(`That video is ${(file.size / 1024 / 1024).toFixed(1)} MB — the limit is ${maxUploadMb} MB.`)
 
     let durationSec: number
     try {
@@ -244,7 +250,7 @@ function VideoInput({
         />
       )}
       <p className="text-xs text-[var(--text-faint)]">
-        Up to {field.maxSizeMb} MB and {formatDuration(field.maxDurationSec!)}. MP4, WebM, MOV or MKV.
+        Up to {maxUploadMb} MB and {formatDuration(field.maxDurationSec!)}. MP4, WebM, MOV or MKV.
       </p>
       {status && <p className="text-xs font-semibold text-[var(--accent)]">{status}</p>}
       {error && <p className="text-xs font-semibold text-[var(--danger)]">{error}</p>}

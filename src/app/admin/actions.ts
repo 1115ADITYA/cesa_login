@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { isAdmin } from '@/lib/adminAuth'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { EVENTS_TAG } from '@/lib/eventData'
-import { sanitizeFields, type FormField } from '@/lib/formFields'
+import { sanitizeFields, sanitizeMaxUploadMb, type FormField } from '@/lib/formFields'
 
 // `updateTag` rather than `revalidateTag`: in Next 16 revalidateTag schedules
 // an expiry against a cache profile, while updateTag expires immediately and
@@ -65,6 +65,7 @@ type EventFields = {
   custom_text: string | null
   allow_invites: boolean
   form_fields: FormField[]
+  max_upload_mb: number
 }
 
 /** Only "N% N%" is ever written by BannerUpload.tsx — anything else is either absent or tampered with. */
@@ -189,6 +190,7 @@ function toEventFields(formData: FormData): { error: string } | { fields: EventF
       custom_text: customText,
       allow_invites: allowInvites,
       form_fields: formFields,
+      max_upload_mb: sanitizeMaxUploadMb(formData.get('maxUploadMb')),
     },
   }
 }
