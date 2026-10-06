@@ -7,7 +7,8 @@ import InviteBox from './InviteBox'
 import { removeTeamMember, respondToInvite, saveTeamAnswers, withdrawRegistration } from '../actions'
 import type { EventTeam, TeamMember } from '@/lib/events'
 import FormFieldsInput from '@/components/FormFieldsInput'
-import { answerText, formatDuration, isVideoAnswer, type Answers, type FormField } from '@/lib/formFields'
+import { answerText, formatDuration, isMemberAnswers, isVideoAnswer, type Answers, type FormField } from '@/lib/formFields'
+import MembersTable from '@/components/MembersTable'
 
 export default function TeamPanel({
   eventId,
@@ -363,6 +364,8 @@ function TeamAnswers({
                 <dd className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--text)]">
                   {answer === undefined ? (
                     <span className="text-[var(--text-faint)]">—</span>
+                  ) : f.type === 'members' ? (
+                    <MembersTable field={f} members={isMemberAnswers(answer) ? answer : []} />
                   ) : isVideoAnswer(answer) ? (
                     `🎬 ${answer.name} · ${formatDuration(answer.durationSec)}`
                   ) : (

@@ -6,10 +6,13 @@ import {
   VIDEO_BUCKET,
   VIDEO_MIME_TYPES,
   formatDuration,
+  isMemberAnswers,
   isVideoAnswer,
+  memberLabel,
   type Answer,
   type Answers,
   type FormField,
+  type MemberAnswers,
   type VideoAnswer,
 } from '@/lib/formFields'
 
@@ -26,6 +29,7 @@ export default function FormFieldsInput({
   userId,
   maxUploadMb,
   onUploadingChange,
+  idPrefix = 'q',
 }: {
   fields: FormField[]
   answers: Answers
@@ -35,6 +39,8 @@ export default function FormFieldsInput({
   /** The event's limit for every video question. */
   maxUploadMb: number
   onUploadingChange?: (uploading: boolean) => void
+  /** Keeps input ids and radio groups apart when the same questions repeat per member. */
+  idPrefix?: string
 }) {
   const set = (id: string, value: Answer | undefined) => {
     const next = { ...answers }
@@ -48,7 +54,7 @@ export default function FormFieldsInput({
       {fields.map((field) => {
         const value = answers[field.id]
         const text = typeof value === 'string' ? value : ''
-        const inputId = `q-${field.id}`
+        const inputId = `${idPrefix}-${field.id}`
         return (
           <div key={field.id} className="flex flex-col gap-1.5">
             <label htmlFor={inputId} className="label">
@@ -85,7 +91,7 @@ export default function FormFieldsInput({
             ) : field.type === 'radio' || field.type === 'checkboxes' ? (
               <div className="flex flex-col gap-2">
                 {field.options!.map((o) => {
-                  const picked = Array.isArray(value) ? value : []
+                  const picked = Array.isArray(value) && !isMemberAnswers(value) ? (value as string[]) : []
                   const checked = field.type === 'radio' ? text === o : picked.includes(o)
                   return (
                     <label key={o} className="flex items-center gap-2.5 text-sm text-[var(--text)]">
@@ -104,6 +110,15 @@ export default function FormFieldsInput({
                   )
                 })}
               </div>
+            ) : field.type === 'members' ? (
+              <MembersInput
+                field={field}
+                value={isMemberAnswers(value) ? value : []}
+                onChange={(v) => set(field.id, v)}
+                eventId={eventId}
+                userId={userId}
+                maxUploadMb={maxUploadMb}
+              />
             ) : field.type === 'video' ? (
               <VideoInput
                 field={field}
@@ -254,6 +269,96 @@ function VideoInput({
       </p>
       {status && <p className="text-xs font-semibold text-[var(--accent)]">{status}</p>}
       {error && <p className="text-xs font-semibold text-[var(--danger)]">{error}</p>}
+    </div>
+  )
+}
+
+/**
+ * "Team members": one card per member, Member 1 being the leader. Cards up to
+ * the minimum are always there and required; the rest are added on demand up
+ * to the maximum. Each card asks the same sub-questions, rendered by the
+ * same component this file exports.
+ */
+function MembersInput({
+  field,
+  value,
+  onChange,
+  eventId,
+  userId,
+  maxUploadMb,
+}: {
+  field: FormField
+  value: MemberAnswers
+  onChange: (value: MemberAnswers) => void
+  eventId: string
+  userId: string
+  maxUploadMb: number
+}) {
+  const min = field.minMembers ?? 1
+  const max = field.maxMembers ?? min
+  const [count, setCount] = useState(Math.min(max, Math.max(min, value.length)))
+
+  const setMember = (index: number, answers: Answers) => {
+    const next = [...value]
+    while (next.length <= index) next.push({})
+    next[index] = answers as Record<string, string | string[]>
+    onChange(next)
+  }
+  const removeLast = () => {
+    onChange(value.slice(0, count - 1))
+    setCount(count - 1)
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-xs text-[var(--text-faint)]">
+        {min === max ? `${min} members` : `${min}–${max} members`} · the first {min === 1 ? 'member is' : `${min} are`}{' '}
+        required.
+      </p>
+      {Array.from({ length: count }, (_, i) => {
+        const entry = value[i] ?? {}
+        // An optional member becomes subject to the required questions as soon
+        // as anything is filled in — the same rule validateAnswers applies.
+        const started = Object.values(entry).some((v) => (Array.isArray(v) ? v.length > 0 : String(v ?? '').trim()))
+        const enforce = i < min || started
+        return (
+          <div key={i} className="rounded-xl border border-[var(--border)] bg-[var(--bg-sunken)] p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-sm font-bold text-white">
+                {memberLabel(i)}
+                {i < min ? (
+                  <span className="ml-2 text-xs font-semibold text-[var(--accent)]">Required</span>
+                ) : (
+                  <span className="ml-2 text-xs font-normal text-[var(--text-faint)]">Optional</span>
+                )}
+              </p>
+              {i === count - 1 && i >= min && (
+                <button
+                  type="button"
+                  onClick={removeLast}
+                  className="text-xs font-semibold text-[var(--text-faint)] hover:text-[var(--danger)]"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+            <FormFieldsInput
+              fields={(field.fields ?? []).map((f) => ({ ...f, required: enforce && f.required }))}
+              answers={entry as Answers}
+              onChange={(a) => setMember(i, a)}
+              eventId={eventId}
+              userId={userId}
+              maxUploadMb={maxUploadMb}
+              idPrefix={`${field.id}-m${i}`}
+            />
+          </div>
+        )
+      })}
+      {count < max && (
+        <button type="button" onClick={() => setCount(count + 1)} className="btn btn-ghost self-start !py-2 !text-sm">
+          + Add member {count + 1}
+        </button>
+      )}
     </div>
   )
 }

@@ -3,7 +3,17 @@ import { isAdmin } from '@/lib/adminAuth'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { AdminHeader } from '../../../AdminShell'
 import TeamRow from './TeamRow'
-import { VIDEO_BUCKET, answerText, formatDuration, isVideoAnswer, sanitizeFields, type Answers, type FormField } from '@/lib/formFields'
+import {
+  VIDEO_BUCKET,
+  answerText,
+  formatDuration,
+  isMemberAnswers,
+  isVideoAnswer,
+  sanitizeFields,
+  type Answers,
+  type FormField,
+} from '@/lib/formFields'
+import MembersTable from '@/components/MembersTable'
 import { renameTeam, removeTeam, addTeamMember, removeTeamMember, makeTeamLeader, searchProfiles } from '../../../actions'
 
 export const metadata = { title: 'Teams — Admin', robots: { index: false } }
@@ -166,11 +176,13 @@ function FormAnswers({
           const answer = answers[f.id]
           const url = isVideoAnswer(answer) ? videoUrls.get(answer.path) : undefined
           return (
-            <div key={f.id} className={f.type === 'long' || f.type === 'video' ? 'sm:col-span-2' : ''}>
+            <div key={f.id} className={f.type === 'long' || f.type === 'video' || f.type === 'members' ? 'sm:col-span-2' : ''}>
               <dt className="text-xs font-semibold text-[var(--text-muted)]">{f.label}</dt>
               <dd className="mt-0.5 whitespace-pre-wrap break-words text-sm text-[var(--text)]">
                 {answer === undefined ? (
                   <span className="text-[var(--text-faint)]">Not answered</span>
+                ) : f.type === 'members' ? (
+                  <MembersTable field={f} members={isMemberAnswers(answer) ? answer : []} />
                 ) : isVideoAnswer(answer) ? (
                   url ? (
                     <a href={url} target="_blank" rel="noreferrer" className="text-[var(--accent-light)] hover:underline">

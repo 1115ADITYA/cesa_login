@@ -17,6 +17,7 @@ export const FIELD_TYPES = {
   radio: 'Multiple choice',
   checkboxes: 'Checkboxes',
   video: 'Video upload',
+  members: 'Team members',
 } as const
 
 export type FieldType = keyof typeof FIELD_TYPES
@@ -31,10 +32,16 @@ export type FormField = {
   options?: string[]
   /** video only — the size limit is per event (events.max_upload_mb). */
   maxDurationSec?: number
+  /** members only: how many member sections, and the questions asked for each. */
+  minMembers?: number
+  maxMembers?: number
+  fields?: FormField[]
 }
 
 export type VideoAnswer = { path: string; name: string; size: number; durationSec: number }
-export type Answer = string | string[] | VideoAnswer
+/** One entry per member, index 0 is the leader; each maps sub-question id → answer. */
+export type MemberAnswers = Record<string, string | string[]>[]
+export type Answer = string | string[] | VideoAnswer | MemberAnswers
 export type Answers = Record<string, Answer>
 
 export const VIDEO_BUCKET = 'event-submissions'
@@ -46,6 +53,21 @@ export const MAX_VIDEO_SECONDS = 3600
 const DEFAULT_VIDEO_SECONDS = 120
 
 const MAX_FIELDS = 30
+export const MAX_MEMBERS = 20
+
+/** Question types allowed inside a "Team members" block — no uploads, no nesting. */
+export const MEMBER_FIELD_TYPES = Object.keys(FIELD_TYPES).filter(
+  (t) => t !== 'video' && t !== 'members',
+) as FieldType[]
+
+/** Name and phone are what organisers ask for first, so a new block starts with them. */
+export function defaultMemberFields(): FormField[] {
+  return [
+    { id: newFieldId(), type: 'short', label: 'Full name', required: true },
+    { id: newFieldId(), type: 'phone', label: 'Phone number', required: true },
+    { id: newFieldId(), type: 'email', label: 'Email', required: false },
+  ]
+}
 
 export function hasOptions(type: FieldType) {
   return type === 'select' || type === 'radio' || type === 'checkboxes'
@@ -65,7 +87,7 @@ function clampInt(value: unknown, min: number, max: number, fallback: number) {
  * field definitions. Anything malformed is dropped rather than rejected, so a
  * bad row can never take the event page down.
  */
-export function sanitizeFields(raw: unknown): FormField[] {
+export function sanitizeFields(raw: unknown, nested = false): FormField[] {
   if (!Array.isArray(raw)) return []
   const seen = new Set<string>()
   const fields: FormField[] = []
@@ -75,6 +97,7 @@ export function sanitizeFields(raw: unknown): FormField[] {
     const f = item as Record<string, unknown>
     const type = String(f.type) as FieldType
     if (!(type in FIELD_TYPES)) continue
+    if (nested && !MEMBER_FIELD_TYPES.includes(type)) continue
     const label = String(f.label ?? '').trim().slice(0, 200)
     if (!label) continue
 
@@ -96,6 +119,15 @@ export function sanitizeFields(raw: unknown): FormField[] {
     if (type === 'video') {
       field.maxDurationSec = clampInt(f.maxDurationSec, 5, MAX_VIDEO_SECONDS, DEFAULT_VIDEO_SECONDS)
     }
+    if (type === 'members') {
+      const sub = sanitizeFields(f.fields, true)
+      if (sub.length === 0) continue
+      field.fields = sub
+      field.minMembers = clampInt(f.minMembers, 1, MAX_MEMBERS, 1)
+      field.maxMembers = clampInt(f.maxMembers, field.minMembers, MAX_MEMBERS, field.minMembers)
+      // The block itself is answered whenever a required member is.
+      field.required = true
+    }
     fields.push(field)
   }
   return fields
@@ -108,6 +140,15 @@ export function sanitizeMaxUploadMb(raw: unknown) {
 
 export function isVideoAnswer(value: unknown): value is VideoAnswer {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value) && 'path' in value)
+}
+
+export function isMemberAnswers(value: unknown): value is MemberAnswers {
+  return Array.isArray(value) && value.every((v) => v && typeof v === 'object' && !Array.isArray(v))
+}
+
+/** "Member 1 · Leader", "Member 2"… — one place, so the form and the roster agree. */
+export function memberLabel(index: number) {
+  return index === 0 ? 'Member 1 · Leader' : `Member ${index + 1}`
 }
 
 export function formatDuration(seconds: number) {
@@ -142,6 +183,24 @@ export function validateAnswers(
         continue
       }
       answers[field.id] = picked
+      continue
+    }
+
+    if (field.type === 'members') {
+      const sub = field.fields ?? []
+      const entries = isMemberAnswers(value) ? value.slice(0, field.maxMembers) : []
+      const members: MemberAnswers = []
+      for (let i = 0; i < Math.max(entries.length, field.minMembers!); i++) {
+        const entry = entries[i] ?? {}
+        const hasAnything = Object.values(entry).some((v) => (Array.isArray(v) ? v.length > 0 : String(v ?? '').trim()))
+        const mustFill = i < field.minMembers!
+        // An optional extra member left blank is simply not there.
+        if (!mustFill && !hasAnything) continue
+        const checked = validateAnswers(sub, entry)
+        if ('error' in checked) return { error: `${field.label} — ${memberLabel(i)}: ${checked.error}` }
+        members.push(checked.answers as Record<string, string | string[]>)
+      }
+      if (members.length > 0) answers[field.id] = members
       continue
     }
 
@@ -214,6 +273,7 @@ export function validateAnswers(
 /** Human-readable answer for the admin roster. */
 export function answerText(answer: Answer | undefined): string {
   if (answer === undefined) return ''
+  if (isMemberAnswers(answer)) return `${answer.length} member${answer.length === 1 ? '' : 's'}`
   if (Array.isArray(answer)) return answer.join(', ')
   if (isVideoAnswer(answer)) return answer.name
   return answer
