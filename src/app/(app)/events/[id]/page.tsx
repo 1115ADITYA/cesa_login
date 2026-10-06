@@ -1,6 +1,8 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getClient, getUser } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
+import { sanitizeFields, type Answers } from '@/lib/formFields'
 import { isProfileComplete, missingProfileFields } from '@/lib/profileFields'
 import RegisterForm from './RegisterForm'
 import TeamPanel from './TeamPanel'
@@ -48,6 +50,15 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   if (!eventRow) notFound()
   const event = eventRow as EventRow
   const team = (teamJson ?? null) as EventTeam | null
+  const formFields = sanitizeFields(event.form_fields)
+
+  // get_event_team only returns teams the caller is on, so reading that team's
+  // answers with the service role does not widen what this member can see.
+  let answers: Answers = {}
+  if (team && formFields.length > 0) {
+    const { data } = await createAdminClient().from('event_teams').select('form_answers').eq('id', team.id).maybeSingle()
+    answers = (data?.form_answers ?? {}) as Answers
+  }
 
   // eslint-disable-next-line react-hooks/purity -- Server Component, computed once per request
   const now = Date.now()
@@ -150,6 +161,10 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
                   maxTeamSize={event.max_team_size}
                   registrationOpen={registrationOpen}
                   eventStarted={phase !== 'upcoming'}
+                  allowInvites={event.allow_invites ?? true}
+                  formFields={formFields}
+                  answers={answers}
+                  userId={user.id}
                 />
               ) : registrationOpen ? (
                 <RegisterForm
@@ -159,6 +174,9 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
                   profile={profile}
                   profileComplete={isProfileComplete(profile)}
                   missingFields={missingProfileFields(profile)}
+                  formFields={formFields}
+                  allowInvites={event.allow_invites ?? true}
+                  userId={user.id}
                 />
               ) : (
                 <div className="glass p-6 text-center">

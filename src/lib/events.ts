@@ -55,6 +55,10 @@ export type EventRow = {
   show_join_button: boolean
   /** Shown where registration would be, for events that take none. */
   custom_text: string | null
+  /** Raw JSON from the database — always read through sanitizeFields(). */
+  form_fields: unknown
+  /** "Invite teammates by username"; off means solo registration. */
+  allow_invites: boolean
 }
 
 export const DEFAULT_DATE_LABEL = 'Coming Soon'

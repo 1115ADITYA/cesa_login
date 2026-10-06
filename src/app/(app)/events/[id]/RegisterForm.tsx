@@ -6,6 +6,8 @@ import { registerForEvent } from '../actions'
 import { teamSizeLabel } from '@/lib/events'
 import Link from 'next/link'
 import type { ProfileDetails } from '@/lib/profileFields'
+import FormFieldsInput from '@/components/FormFieldsInput'
+import type { Answers, FormField } from '@/lib/formFields'
 
 /**
  * Step one, and only step one. Inviting friends used to happen in this same
@@ -20,6 +22,9 @@ export default function RegisterForm({
   profile,
   profileComplete,
   missingFields,
+  formFields,
+  allowInvites,
+  userId,
 }: {
   eventId: string
   minTeamSize: number
@@ -27,10 +32,15 @@ export default function RegisterForm({
   profile: Partial<ProfileDetails> | null
   profileComplete: boolean
   missingFields: string[]
+  formFields: FormField[]
+  allowInvites: boolean
+  userId: string
 }) {
   const router = useRouter()
   const solo = maxTeamSize === 1
   const [teamName, setTeamName] = useState('')
+  const [answers, setAnswers] = useState<Answers>({})
+  const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
@@ -38,7 +48,7 @@ export default function RegisterForm({
     e.preventDefault()
     setError(null)
     startTransition(async () => {
-      const result = await registerForEvent(eventId, teamName)
+      const result = await registerForEvent(eventId, teamName, answers)
       if ('error' in result) {
         setError(result.error)
         return
@@ -55,12 +65,14 @@ export default function RegisterForm({
         </h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           {solo
-            ? 'This is a solo event — one click and you are in.'
+            ? formFields.length > 0
+              ? 'Answer the questions below and you are in.'
+              : 'This is a solo event — one click and you are in.'
             : `${teamSizeLabel(minTeamSize, maxTeamSize)}. Register now, then invite your friends — your spot is held while they reply.`}
         </p>
       </div>
 
-      {!solo && <Steps minTeamSize={minTeamSize} />}
+      {!solo && allowInvites && <Steps minTeamSize={minTeamSize} />}
 
       {error && <div className="alert alert-error">{error}</div>}
 
@@ -114,8 +126,22 @@ export default function RegisterForm({
         </div>
       )}
 
-      <button type="submit" disabled={pending || !profileComplete} className="btn btn-primary !py-3">
-        {pending ? 'Registering…' : solo ? 'Register' : 'Register & pick teammates'}
+      {formFields.length > 0 && (
+        <div className="flex flex-col gap-3 border-t border-[var(--border)] pt-5">
+          <h3 className="label">Registration form</h3>
+          <FormFieldsInput
+            fields={formFields}
+            answers={answers}
+            onChange={setAnswers}
+            eventId={eventId}
+            userId={userId}
+            onUploadingChange={setUploading}
+          />
+        </div>
+      )}
+
+      <button type="submit" disabled={pending || uploading || !profileComplete} className="btn btn-primary !py-3">
+        {pending ? 'Registering…' : uploading ? 'Uploading video…' : solo || !allowInvites ? 'Register' : 'Register & pick teammates'}
       </button>
     </form>
   )

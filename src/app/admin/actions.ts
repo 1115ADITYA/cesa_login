@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { isAdmin } from '@/lib/adminAuth'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { EVENTS_TAG } from '@/lib/eventData'
+import { sanitizeFields, type FormField } from '@/lib/formFields'
 
 // `updateTag` rather than `revalidateTag`: in Next 16 revalidateTag schedules
 // an expiry against a cache profile, while updateTag expires immediately and
@@ -62,6 +63,8 @@ type EventFields = {
   join_url: string | null
   show_join_button: boolean
   custom_text: string | null
+  allow_invites: boolean
+  form_fields: FormField[]
 }
 
 /** Only "N% N%" is ever written by BannerUpload.tsx — anything else is either absent or tampered with. */
@@ -141,10 +144,23 @@ function toEventFields(formData: FormData): { error: string } | { fields: EventF
   if (closesAt && Number.isNaN(closesAt.getTime())) return { error: 'Registration close time is not a valid date.' }
   if (closesAt && endsAt && closesAt > endsAt) return { error: 'Registration cannot close after the event has ended.' }
 
-  const minRaw = allOptional ? '' : String(formData.get('minTeamSize') || '').trim()
-  const maxRaw = allOptional ? '' : String(formData.get('maxTeamSize') || '').trim()
+  // Invites off means everyone registers alone, so the event is saved as solo
+  // — the team-size fields are not even shown. 0013's trigger refuses invites.
+  const allowInvites = allOptional || formData.get('allowInvites') === 'on'
+  const teamSizes = !allOptional && allowInvites
+  const minRaw = teamSizes ? String(formData.get('minTeamSize') || '').trim() : ''
+  const maxRaw = teamSizes ? String(formData.get('maxTeamSize') || '').trim() : ''
   const minTeamSize = minRaw ? Number(minRaw) : 1
-  const maxTeamSize = maxRaw ? Number(maxRaw) : null
+  const maxTeamSize = maxRaw ? Number(maxRaw) : allowInvites ? null : 1
+
+  let formFields: FormField[] = []
+  if (!allOptional) {
+    try {
+      formFields = sanitizeFields(JSON.parse(String(formData.get('formFields') || '[]')))
+    } catch {
+      return { error: 'The registration form could not be read — try again.' }
+    }
+  }
 
   if (!Number.isInteger(minTeamSize) || minTeamSize < 1) return { error: 'Min team size must be a whole number, 1 or more.' }
   if (maxTeamSize !== null && (!Number.isInteger(maxTeamSize) || maxTeamSize < 1)) {
@@ -171,6 +187,8 @@ function toEventFields(formData: FormData): { error: string } | { fields: EventF
       join_url: joinUrl,
       show_join_button: showJoinButton,
       custom_text: customText,
+      allow_invites: allowInvites,
+      form_fields: formFields,
     },
   }
 }

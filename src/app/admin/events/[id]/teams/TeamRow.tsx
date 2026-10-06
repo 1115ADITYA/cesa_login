@@ -28,6 +28,7 @@ export default function TeamRow({
   removeTeamMember,
   makeTeamLeader,
   searchProfiles,
+  children,
 }: {
   team: Team
   eventId: string
@@ -39,6 +40,8 @@ export default function TeamRow({
   removeTeamMember: (memberId: string, eventId: string) => Promise<void>
   makeTeamLeader: (memberId: string, eventId: string) => Promise<void>
   searchProfiles: (query: string, eventId: string) => Promise<Suggestion[]>
+  /** The team's registration-form answers, rendered by the page. */
+  children?: React.ReactNode
 }) {
   const [editingName, setEditingName] = useState(false)
   const [name, setName] = useState(team.name)
@@ -315,6 +318,8 @@ export default function TeamRow({
           <p className="mt-2 text-xs text-[var(--text-faint)]">No account matches “{q}”.</p>
         )}
       </div>
+
+      {children}
 
       {selectedMember && (
         <div

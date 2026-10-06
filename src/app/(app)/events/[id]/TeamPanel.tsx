@@ -4,8 +4,10 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import TeamProgress from '@/components/TeamProgress'
 import InviteBox from './InviteBox'
-import { removeTeamMember, respondToInvite, withdrawRegistration } from '../actions'
+import { removeTeamMember, respondToInvite, saveTeamAnswers, withdrawRegistration } from '../actions'
 import type { EventTeam, TeamMember } from '@/lib/events'
+import FormFieldsInput from '@/components/FormFieldsInput'
+import { answerText, formatDuration, isVideoAnswer, type Answers, type FormField } from '@/lib/formFields'
 
 export default function TeamPanel({
   eventId,
@@ -14,6 +16,10 @@ export default function TeamPanel({
   maxTeamSize,
   registrationOpen,
   eventStarted,
+  allowInvites,
+  formFields,
+  answers,
+  userId,
 }: {
   eventId: string
   team: EventTeam
@@ -21,6 +27,10 @@ export default function TeamPanel({
   maxTeamSize: number | null
   registrationOpen: boolean
   eventStarted: boolean
+  allowInvites: boolean
+  formFields: FormField[]
+  answers: Answers
+  userId: string
 }) {
   const router = useRouter()
   const [inviting, setInviting] = useState(false)
@@ -137,8 +147,19 @@ export default function TeamPanel({
 
       {error && <div className="alert alert-error mt-4">{error}</div>}
 
+      {formFields.length > 0 && (
+        <TeamAnswers
+          teamId={team.id}
+          eventId={eventId}
+          fields={formFields}
+          answers={answers}
+          canEdit={team.isLeader && registrationOpen}
+          userId={userId}
+        />
+      )}
+
       <div className="mt-5 flex flex-col gap-4">
-        {team.isLeader && registrationOpen && (
+        {team.isLeader && registrationOpen && allowInvites && (
           inviting ? (
             <InviteBox teamId={team.id} eventId={eventId} seatsLeft={seatsLeft} onDone={() => setInviting(false)} />
           ) : (
@@ -240,5 +261,113 @@ function MemberRow({
         </button>
       )}
     </li>
+  )
+}
+
+/**
+ * The team's registration-form answers: read-only for everyone on the team,
+ * editable by the leader until registration closes.
+ */
+function TeamAnswers({
+  teamId,
+  eventId,
+  fields,
+  answers,
+  canEdit,
+  userId,
+}: {
+  teamId: string
+  eventId: string
+  fields: FormField[]
+  answers: Answers
+  canEdit: boolean
+  userId: string
+}) {
+  const router = useRouter()
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState<Answers>(answers)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [pending, startTransition] = useTransition()
+  const unanswered = fields.filter((f) => f.required && answers[f.id] === undefined).length
+
+  const save = () => {
+    setError(null)
+    startTransition(async () => {
+      const result = await saveTeamAnswers(teamId, eventId, draft)
+      if ('error' in result) {
+        setError(result.error)
+        return
+      }
+      setEditing(false)
+      router.refresh()
+    })
+  }
+
+  return (
+    <div className="mt-6 border-t border-[var(--border)] pt-5">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="eyebrow">Registration form</h3>
+        {canEdit && !editing && (
+          <button
+            onClick={() => {
+              setDraft(answers)
+              setEditing(true)
+            }}
+            className="text-xs font-bold text-[var(--accent)] hover:underline"
+          >
+            {unanswered > 0 ? 'Fill in' : 'Edit answers'}
+          </button>
+        )}
+      </div>
+
+      {canEdit && unanswered > 0 && !editing && (
+        <p className="mb-3 rounded-xl border border-[var(--warning)]/20 bg-[var(--warning)]/8 p-3 text-sm text-[var(--warning)]">
+          {unanswered} required question{unanswered === 1 ? '' : 's'} still unanswered.
+        </p>
+      )}
+
+      {editing ? (
+        <div className="flex flex-col gap-4">
+          <FormFieldsInput
+            fields={fields}
+            answers={draft}
+            onChange={setDraft}
+            eventId={eventId}
+            userId={userId}
+            onUploadingChange={setUploading}
+          />
+          {error && <div className="alert alert-error">{error}</div>}
+          <div className="flex gap-2">
+            <button onClick={save} disabled={pending || uploading} className="btn btn-primary !py-2 !text-sm">
+              {pending ? 'Saving…' : uploading ? 'Uploading video…' : 'Save answers'}
+            </button>
+            <button onClick={() => setEditing(false)} disabled={pending} className="btn btn-ghost !py-2 !text-sm">
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <dl className="flex flex-col gap-3">
+          {fields.map((f) => {
+            const answer = answers[f.id]
+            return (
+              <div key={f.id}>
+                <dt className="text-xs font-semibold text-[var(--text-muted)]">{f.label}</dt>
+                <dd className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--text)]">
+                  {answer === undefined ? (
+                    <span className="text-[var(--text-faint)]">—</span>
+                  ) : isVideoAnswer(answer) ? (
+                    `🎬 ${answer.name} · ${formatDuration(answer.durationSec)}`
+                  ) : (
+                    answerText(answer)
+                  )}
+                </dd>
+              </div>
+            )
+          })}
+        </dl>
+      )}
+    </div>
   )
 }

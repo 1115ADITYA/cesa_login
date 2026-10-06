@@ -2,6 +2,8 @@
 
 import { useActionState, useState } from 'react'
 import ImageUpload from './ImageUpload'
+import FormBuilder from './FormBuilder'
+import type { FormField } from '@/lib/formFields'
 
 type EventDefaults = {
   title?: string
@@ -20,6 +22,8 @@ type EventDefaults = {
   customText?: string
   minTeamSize?: number | null
   maxTeamSize?: number | null
+  allowInvites?: boolean
+  formFields?: FormField[]
 }
 
 /** `datetime-local` wants "YYYY-MM-DDTHH:mm", not a full ISO string. */
@@ -45,6 +49,7 @@ export default function EventForm({
   const [showJoin, setShowJoin] = useState(defaults?.showJoinButton ?? false)
   // Coming Soon or Join Now: the event needs nothing else to be published.
   const allOptional = comingSoon || showJoin
+  const [allowInvites, setAllowInvites] = useState(defaults?.allowInvites ?? true)
 
   return (
     <form action={formAction} className="glass flex max-w-xl flex-col gap-4 p-6">
@@ -151,24 +156,45 @@ export default function EventForm({
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Min team size">
-              <input
-                type="number"
-                min={1}
-                name="minTeamSize"
-                defaultValue={defaults?.minTeamSize ?? 1}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Max team size (blank = no cap)">
-              <input type="number" min={1} name="maxTeamSize" defaultValue={defaults?.maxTeamSize ?? ''} className={inputClass} />
-            </Field>
-          </div>
-          <p className="-mt-2 text-xs text-[var(--text-faint)]">
-            A team is only <strong className="text-[var(--text)]">confirmed</strong> once the minimum number of members have
-            accepted their invitations. Set both to 1 for a solo event — participants then register without naming a team.
-          </p>
+          <label className="flex items-center gap-2.5 text-sm font-semibold text-[var(--text)]">
+            <input
+              type="checkbox"
+              name="allowInvites"
+              checked={allowInvites}
+              onChange={(e) => setAllowInvites(e.target.checked)}
+              className="h-4 w-4 accent-[var(--accent)]"
+            />
+            Invite teammates by username
+          </label>
+          {allowInvites ? (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Min team size">
+                  <input
+                    type="number"
+                    min={1}
+                    name="minTeamSize"
+                    defaultValue={defaults?.minTeamSize ?? 1}
+                    className={inputClass}
+                  />
+                </Field>
+                <Field label="Max team size (blank = no cap)">
+                  <input type="number" min={1} name="maxTeamSize" defaultValue={defaults?.maxTeamSize ?? ''} className={inputClass} />
+                </Field>
+              </div>
+              <p className="-mt-2 text-xs text-[var(--text-faint)]">
+                A team is only <strong className="text-[var(--text)]">confirmed</strong> once the minimum number of members have
+                accepted their invitations. Set both to 1 for a solo event — participants then register without naming a team.
+              </p>
+            </>
+          ) : (
+            <p className="-mt-2 text-xs text-[var(--text-faint)]">
+              Off: each person registers on their own and there is no invite step. Add a question to the registration
+              form below if you need teammates&apos; names.
+            </p>
+          )}
+
+          <FormBuilder name="formFields" defaultFields={defaults?.formFields} />
         </>
       )}
 
